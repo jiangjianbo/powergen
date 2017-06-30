@@ -1,0 +1,46 @@
+/** 工程 */
+entity Project{
+    projName String required,
+    projDescription String,
+    createDate LocalDate required,
+}
+
+/** 任务 */
+entity Task {
+    taskName String required,
+    taskDescription String,
+//    employeeId String,
+}
+
+relationship OneToMany{
+/** 工程的任务 */
+    Project{task}
+    to 
+    /** 任务隶属工程 */
+    Task{project}
+}
+
+entity Member{
+/** 成员名称 */
+    name String required,
+}
+
+relationship ManyToMany{
+    Task{employee}
+    to 
+    Member{task}
+}
+
+dto * with mapstruct
+
+paginate * with pager
+
+service * with serviceImpl
+
+
+
+
+
+
+
+

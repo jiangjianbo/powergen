@@ -11,19 +11,22 @@
 	生成三个层次的工程代码之后，脚本会将这三个目录中的生成的代码内容复制到本目录之下，并组装这些代码。
 
 	脚本会使用如下的属性变量，在maven环境下运行会自动生成这些属性值，非maven环境下从 powergen.properties 中获取：
-		project_name 工程的名字， 默认是 project.artifactId
-		project_package 工程的命名空间，默认是 project.groupId + project.artifactId
-		source_output_dir 存放生成代码的目录位置，默认是 src/main/java 
-		model_input_dir  存放 jdl 文件的目录位置，默认是 src/main/model
+		project_name     工程的名字， 默认是 project.artifactId
+		project_package  工程的命名空间，默认是 project.groupId + project.artifactId
+		project_dir      工程根目录，默认是 pom.xml 的目录
+		output_dir       输出目录位置，存放各种中间状态的输出，默认是 target
+		source_merge_dir 生成的代码最终合并到的目录位置，默认是 src/main/java 
+		model_dir        存放 jdl 文件的目录位置，默认是 src/main/model
 	
-	代码分 环境设置 setenv， 工具类 tool，代码生成 gen几个部分，分别用相应的前缀作为 target的名字。
+	代码分为： 环境设置 setenv， 工具类 tool，代码生成 gen几个部分，分别用相应的前缀作为 target的名字。
 -->
 <project name="powergen">
 
-	<target name="setenv.taskdef" depends="setenv.taskdef.maven, setenv.taskdef.ant">
+	<target name="setenv.taskdef" depends="setenv.detect.sys, setenv.taskdef.maven, setenv.taskdef.ant">
 	</target>
 
 	<target name="setenv.taskdef.maven" if="is-in-maven">
+		<property name="plugin_classpath" refid="maven.plugin.classpath" />
 		<!-- 装入antlib库 -->
 		<taskdef resource="net/sf/antcontrib/antlib.xml" classpath="${plugin_classpath}"/>
 	</target>
@@ -33,9 +36,9 @@
 		<taskdef resource="net/sf/antcontrib/antlib.xml" />
 	</target>
 
-	<target name="setenv.detect">
+	<target name="setenv.detect.sys">
 		<condition property="is-in-maven">
-			<isset property="maven.plugin.classpath" />
+			<isset property="maven.project.artifactId" />
 		</condition>
 
 		<condition property="is-windows-os">
@@ -43,40 +46,85 @@
 		</condition>
 	</target>
 
+	<target name="setenv.detect.project">
+		<condition property="has-yo_rc">
+			<available file="${basedir}/.yo-rc.json"/>
+		</condition>
+        <condition property="has-inited">
+            <available file="${basedir}/mvnw"/>
+        </condition>
+		<condition property="has-modules">
+			<available file="${basedir}/node_modules" type="dir" />
+		</condition>
+	</target>
+
 	<!-- 设置系统变量的默认值 -->
 	<target name="setenv.vars" depends="setenv.vars.defs, setenv.vars.maven, setenv.vars.ant, setenv.vars.check, setenv.vars.assert">
-		<echo message="log level         =${loglevel}" />
-		<echo message="project name      =${project_name}" />
-		<echo message="project package   =${project_package}" />
-		<echo message="source output dir =${source_output_dir}" />
-		<echo message="model input dir   =${model_input_dir}" />
+		<propertyregex property="project_package_dir"
+              input="${project_package}"
+              regexp="\."
+              replace="/"
+              global="true" 
+			  defaultValue="${project_package}"
+		/>
+
+		<echo message="log level         = ${loglevel}" />
+		<echo message="project name      = ${project_name}" />
+		<echo message="project package   = ${project_package}" />
+		<echo message="project root      = ${project_dir}" />
+		<echo message="source merge dir  = ${source_merge_dir}" />
+		<echo message="model input dir   = ${model_dir}" />
+		<echo message="output dir        = ${output_dir}" />
+		<echo message="package dir       = ${project_package_dir}" />
 	</target>
 
 	<target name="setenv.vars.defs">
-		<property name="loglevel" value="error" />
+		<property name="loglevel" value="debug" />
+
+		<property environment="env"/>
+
+		<property name="skip-build" value="false" />
+		<property name="skip-build-vo" value="false" />
+		<property name="skip-build-bo" value="false" />
+		<property name="skip-build-po" value="false" />
 	</target>
 
-	<target name="setenv.vars.maven" if="is-in-maven">
-		<property name="project_name" value="${project.artifactId}" />
+    <target name="setenv.options">
+        <!-- 记录日志 error|warn|info|verbose|debug -->
+        <record name="${basedir}/target/logs/generate.log" loglevel="${loglevel}" action="start"/>
+    </target>
+
+	<target name="setenv.vars.maven" if="is-in-maven" depends="setenv.detect.sys, setenv.taskdef" >
+		<property name="project_name" value="${maven.project.artifactId}" />
+
 		<propertyregex property="project_package"
-              input="${project.groupId}.${artifactId}"
+              input="${maven.project.groupId}.${maven.project.artifactId}"
               regexp="\-"
               replace="_"
-              casesensitive="false" />
-		<property name="source_output_dir" value="src/main/java" />
-		<property name="model_input_dir" value="src/main/model" />
+			  global="true"
+			  defaultValue="${maven.project.groupId}.${maven.project.artifactId}"
+		/>
 
-		<property name="plugin_classpath" refid="maven.plugin.classpath" />
+	    <property name="project_dir" value="${basedir}" />
+		<property name="output_dir" value="${basedir}/target" />
+		<property name="source_merge_dir" value="${basedir}/src" />
+		<property name="model_dir" value="${basedir}/src/main/model" />
+
 	</target>
 
-	<target name="setenv.vars.ant" unless="is-in-maven">
-		<property file="${basedir}/powergen.properties" />
+	<target name="setenv.vars.ant" unless="is-in-maven" depends="setenv.detect.sys" >
+		<property file="${basedir}/generate.properties" />
 	</target>
 
 	<target name="setenv.vars.check">
-		<condition name="vars_valid">
-			<available dir="${source_output_dir}" type="dir" />
-			<available dir="${model_input_dir}" type="dir" />
+		<mkdir dir="${output_dir}/logs" />
+		<condition property="vars_valid">
+			<and>
+    			<available file="${project_dir}" type="dir" />
+    			<available file="${output_dir}" type="dir" />
+    			<available file="${source_merge_dir}" type="dir" />
+    			<available file="${model_dir}" type="dir" />
+			</and>
 		</condition>
 	</target>
 
@@ -84,12 +132,7 @@
 		<fail message="vars definition invalid" />
 	</target>
 
-	<target name="setenv.options">
-		<!-- 记录日志 -->
-		<record name="${basedir}/target/logs/generate.log" loglevel="${loglevel}" action="start"/>
-	</target>
-
-	<target name="setenv" depends="setenv.vars, setenv.detect, setenv.options, setenv.taskdef">
+	<target name="setenv" depends="setenv.detect.sys, setenv.vars, setenv.options, setenv.taskdef, setenv.detect.project">
 	</target>
 
 	<target name="show-help" >
@@ -99,192 +142,261 @@
 		<echo message="-Dskip-build-vo=true  跳过 vo 的构建"/>
 		<echo message="-Dskip-build-po=true  跳过 po 的构建"/>
 		<echo message="-Dskip-build-bo=true  跳过 bo 的构建"/>
-		<echo message="-Dskip-save-jh=true   跳过 jh 的同步"/>
     </target>
 
+	<target name="generate" depends="setenv, gen.mkdir, gen.yo_rc, gen.init">
+		<echo message="generate ..." />
 
-    <target name="set-model-dir" >
-        <if>
-            <istrue value="${model-dir-exists}" />
-            <then>
-                <property name="model-dir" value="${basedir}/src/main/model" />
-            </then>
-            <else>
-                <property name="model-dir" value="${basedir}" />
-                <property name="model-dir-target" value="${basedir}/src/main/model" />
-            </else>
-        </if>
-    </target>
+		<for list="vo,bo,po" param="layer">
+  			<sequential>
+			  	<var name="target_layer" value="@{layer}" />
+  				<var name="is_@{layer}" value="true" />
+				<if>
+					<and>
+						<isfalse value="${skip-build}" />
+						<isfalse value="${skip-build-@{layer}}" />
+					</and>
+					<then>
+						<!-- 依次处理每一个层 -->
+						<antcall target="gen.layer" >
+						</antcall>
+					</then>
+				</if>
+  				<var name="is_@{layer}" value="false" />
+  			</sequential>
+		</for>
 
-    <target name="load-properties" depends="set-model-dir" >
-        <if>
-            <available file="${model-dir}/generate.properties"/>
-            <then>
-	            <property file="${model-dir}/generate.properties"/>
-	        </then>
-	        <else>
-	            <fail message="require generate.properties"/>
-	        </else>
-	    </if>
+		<antcall target="gen.improve">
+		</antcall>
+
+		<echo message="generate OK!" />
 	</target>
 
+	<target name="gen.yo_rc" unless="has-yo_rc" >
+		<echo file="${project_dir}/.yo-rc.json" append="false">{
+  "generator-jhipster": {
+    "promptValues": {
+      "packageName": "${project_package}",
+      "nativeLanguage": "en"
+    },
+    "jhipsterVersion": "4.5.2",
+    "baseName": "${project_name}",
+    "packageName": "${project_package}",
+    "packageFolder": "${project_package_dir}",
+    "serverPort": "8080",
+    "authenticationType": "session",
+    "hibernateCache": "ehcache",
+    "clusteredHttpSession": false,
+    "websocket": false,
+    "databaseType": "sql",
+    "devDatabaseType": "h2Disk",
+    "prodDatabaseType": "mysql",
+    "searchEngine": false,
+    "messageBroker": false,
+    "serviceDiscoveryType": false,
+    "buildTool": "maven",
+    "enableSocialSignIn": false,
+    "rememberMeKey": "e832ea76e42281686f61160e8e37d3b5c9707a64",
+    "clientFramework": "angular1",
+    "useSass": false,
+    "clientPackageManager": "yarn",
+    "applicationType": "monolith",
+    "testFrameworks": [],
+    "jhiPrefix": "jhi",
+    "enableTranslation": true,
+    "nativeLanguage": "en",
+    "languages": [
+      "en",
+      "zh-cn"
+    ]
+  }
+}
+		</echo>
+	</target>
 
-	<!-- - - - - - - - - - - - - - - - - -
-          target: check-vbp-o-projects 检查并创建三个目标工程目录
-         - - - - - - - - - - - - - - - - - -->
-    <target name="check-vbp-o-projects" depends="search-node-modules-dir" >
-    	<!-- 先给basedir链接一个 node-module -->
-    	<antcall target="link-node-module" inheritAll="false">
-			<param name="proj-dir" value="${basedir}"/>
-			<param name="nmdir" value="${node-modules-dir}"/>
-		</antcall>
-    	<!-- 给其他工程建目录 -->
-    	<for list="vo,bo,po" param="proj" delimiter="," trim="true" >
-    		<sequential>
-    			<!-- 生成工程 -->
-    			<antcall target="check-project" inheritAll="false">
-		    		<param name="proj-dir" value="${@{proj}-project}"/>
-		    		<param name="jh-file" value="@{proj}.jh"/>
-		    		<param name="nmdir" value="${node-modules-dir}"/>
-		    	</antcall>
-    		</sequential>
-    	</for>
-    </target>
+	<target name="gen.init" unless="has-inited" >
+	
+	</target>
+	
+	<target name="gen.mkdir">
+		<mkdir dir="${output_dir}" />
 
-    <target name="search-node-modules-dir">
-    	<var name="curdir" value="${basedir}" />
-		<for list="1,2,3,4,5" param="level" delimiter="," trim="true" >
+		<property name="vo_dir" value="${output_dir}/vo" />
+		<property name="bo_dir" value="${output_dir}/bo" />
+		<property name="po_dir" value="${output_dir}/po" />
+
+		<mkdir dir="${vo_dir}" />
+		<mkdir dir="${bo_dir}" />
+		<mkdir dir="${po_dir}" />
+	</target>
+
+	<!-- 所有 gen. 开头的都依赖于 target_layer 属性 -->
+	<target name="gen.layer" depends="gen.copy, gen.build, gen.merge, gen.fix" >
+	
+	</target>
+
+	<target name="gen.copy">
+		<!-- 复制当前工程的基本配置文件 -->
+		<copy file="${project_dir}/.yo-rc.json" todir="${output_dir}/${target_layer}" overwrite="true" />
+		<copy file="${model_dir}/${project_name}.${target_layer}.jdl" 
+			tofile="${output_dir}/${target_layer}/${project_name}.${target_layer}.jdl" 
+			overwrite="true" />
+
+		<if>
+			<not><available file="${output_dir}/${target_layer}/node_modules" type="dir" /></not>
+			<then>
+				<!-- 准备链接 node_modules -->
+				<antcall target="tool.link">
+					<param name="from.dir" value="${project_dir}/node_modules"/>
+					<param name="to.link" value="${output_dir}/${target_layer}/node_modules"/>
+				</antcall>
+			</then>
+		</if>
+	</target>
+	
+	<target name="gen.build">
+		<!-- 只有没设置 skip-build-XX 的时候才运行 -->
+		<for list="${target_layer}" param="proj">
 			<sequential>
 				<if>
-					<not><isset property="node-modules-dir"/></not>
+					<istrue value="${is-windows-os}" />
 					<then>
-						<echo>search node_modules in ${curdir}</echo>
-						<first id="dir-@{level}" >
-							<sort>
-								<dirset dir="${curdir}" >
-									<and>
-										<filename name="**/node_modules" />
-										<scriptselector language="javascript">
-											var sel = /[\\/]node_modules$/.test(filename) == true &amp;&amp;
-													  /[\\/]node_modules[\\/]/.test(filename) == false;
-											self.setSelected(sel);
-										</scriptselector>
-									</and>
-								</dirset>
-								<name />
-							</sort>
-						</first>
-
-						<property name="nmdir-@{level}" refid="dir-@{level}"  />
-
-						<if>
-							<and>
-								<not><equals arg1="${nmdir-@{level}}" arg2="" /></not>
-								<available file="${nmdir-@{level}}" type="dir" />
-							</and>
-							<then>
-								<property name="node-modules-dir" value="${nmdir-@{level}}"/>
-								<echo message="... node_modules found ${nmdir-@{level}}" />
-							</then>
-							<else>
-								<echo message="... node_modules not found!" />
-							</else>
-						</if>
-					</then>
-				</if>
-				<var name="curdir" value="${curdir}/.." />
-	  		</sequential>
-		</for>
-    </target>
-
-	<!-- 参数：proj-dir=要复制的目标文件夹，jh-file=写入的jh文件名 -->
-	<target name="check-project" >
-		<echo>checking project ${proj-dir} ...</echo>
-		<!-- 创建目录，如果存在则忽略，然后复制pom.xml，.yo-rc.json， jh文件 -->
-		<mkdir dir="${proj-dir}" />
-		<copy file="${basedir}/.yo-rc.json" tofile="${proj-dir}/.yo-rc.json" overwrite="false"  preservelastmodified="true" />
-		<copy file="${basedir}/src/main/jh/${jh-file}" tofile="${proj-dir}/${jh-file}" overwrite="false" preservelastmodified="true" />
-		<!-- 链接 node-modules -->
-		<antcall target="link-node-module" inheritAll="false">
-    		<param name="proj-dir" value="${proj-dir}"/>
-    		<param name="nmdir" value="${nmdir}"/>
-    	</antcall>
-	</target>
-
-	<target name="link-node-module" >
-		<!-- 如果当前不存在，则寻找 node_modules 将其 link 到目标目录 -->
-		<if>
-			<not><available file="${proj-dir}/node_modules" type="dir" /></not>
-			<then>
-				<if>
-					<not><equals arg1="${nmdir}" arg2="" /></not>
-					<then>
-						<echo message="... linking ${nmdir} ..." />
-						<pathconvert property="local-dir" targetos="windows" >
-						    <path location="${nmdir}" />
+						<pathconvert property="proj-dir-@{proj}" targetos="windows" >
+							<path location="${output_dir}/${target_layer}" />
 						</pathconvert>
-						<exec dir="${proj-dir}" executable="cmd.exe" osfamily="windows" failonerror="true" >
-				  		  	<arg line='/c mklink /j node_modules "${local-dir}" ' />
-				  		</exec>
-				  		<exec dir="${proj-dir}" executable="/bin/ln" osfamily="unix" failonerror="true" >
-				  		  	<arg line="-s ${nmdir} node_modules"/>
-				  		</exec>
+						<echo message="... building ${proj-dir-@{proj}} ..." />
+						<shellscript shell="cmd.exe" tmpsuffix=".bat" dir="${proj-dir-@{proj}}" osfamily="windows" failonerror="true" >
+							<arg value="/c"/>
+							<arg value="call"/>
+							yo jhipster --force
+							if "%errorlevel%" == "0" (
+							    echo ================generate from ${project_name}.@{proj}.jdl======================
+							    yo jhipster:import-jdl ${project_name}.@{proj}.jdl --force
+							)
+						</shellscript>
 					</then>
 					<else>
-						<echo message="... node_modules not found!" />
+						<echo message="... building @{proj} ..." />
+						<shellscript shell="bash" dir="${output_dir}/${target_layer}" osfamily="unix" failonerror="true" >
+							yo jhipster --force
+							if [ "$?" -eq "0" ]
+							then
+							    echo "================generate from ${project_name}.@{proj}.jdl======================"
+								yo jhipster:import-jdl ${project_name}.@{proj}.jdl --force
+							fi
+						</shellscript>
 					</else>
 				</if>
+			</sequential>
+		</for>
+		<!-- 判断 project目录 是否包含源代码, 如果没有则复制一个 -->
+        <if>
+            <and>
+                <not><available file="${project_dir}/mvnw" /></not>
+            </and>
+            <then>
+            	<echo>copy files for init</echo>
+                <copy todir="${project_dir}" overwrite="false" >
+            	    <fileset dir="${output_dir}/${target_layer}">
+            	    	<exclude name="*.jdl"/>
+            	    	<exclude name="*.jh"/>
+            	        <exclude name="pom.xml"/>
+            	    	<exclude name=".yo-rc.json"/>
+            	    	<exclude name="target" />
+            	    	<exclude name="node_modules" />
+            	    </fileset>
+                </copy>
+            </then>
+        </if>
+		
+		<!-- 判断是否存在project目录的 node_modules,如果没有则移动一个，且为当前处理建立link -->
+		<if>
+			<and>
+				<not><available file="${project_dir}/node_modules" /></not>
+				<available file="${output_dir}/${target_layer}/node_modules" />
+			</and>
+			<then>
+				<echo>moving node_modules for standard</echo>
+				<move file="${output_dir}/${target_layer}/node_modules" tofile="${project_dir}/node_modules" />
+    			<antcall target="tool.link">
+					<param name="from.dir" value="${project_dir}/node_modules"/>
+					<param name="to.link" value="${output_dir}/${target_layer}/node_modules"/>
+				</antcall>
 			</then>
 		</if>
 	</target>
 
-	<target name="save-new-jh" unless="skip-save-jh" >
-		<for list="vo,bo,po" param="proj" delimiter="," trim="true" >
-    		<sequential>
-    			<copy file="${@{proj}-project}/@{proj}.jh" tofile="${basedir}/src/main/jh/@{proj}.jh" overwrite="false" preservelastmodified="true" />
-    		</sequential>
-    	</for>
+	<target name="tool.link">
+		<!-- 如果当前不存在，则寻找 node_modules 将其 link 到目标目录 -->
+		<if>
+			<and>
+				<available file="${from.dir}" type="dir" />
+				<not><available file="${to.link}" type="dir" /></not>
+			</and>
+			<then>
+				<echo message="... linking ${from.dir} to ${to.link} ..." />
+				<pathconvert property="local-dir" targetos="windows" >
+					<path location="${from.dir}" />
+				</pathconvert>
+				<basename property="linkdir" file="${to.link}"/>
+				<exec dir="${linkdir}" executable="cmd.exe" osfamily="windows" failonerror="true" >
+					<arg line='/c mklink /j node_modules "${local-dir}" ' />
+				</exec>
+				<exec dir="${linkdir}" executable="/bin/ln" osfamily="unix" failonerror="true" >
+					<arg line="-s ${from.dir} ${to.link}"/>
+				</exec>
+			</then>
+			<else>
+				<echo message="... link ${from.dir} to ${to.link} fail!" />
+			</else>
+		</if>
 	</target>
 
-	<target name="build-vbp-projects" unless="skip-build" >
-		<for list="vo,bo,po" param="proj" delimiter="," trim="true" >
-    		<sequential>
-    			<if>
-    				<not> <isset property="skip-build-@{proj}" /> </not>
-    				<then>
-    					<!-- 只有没设置 skip-build-XX 的时候才运行 -->
-		    			<if>
-		    				<istrue value="${isWin}" />
-		    				<then>
-								<pathconvert property="proj-dir-@{proj}" targetos="windows" >
-								    <path location="${@{proj}-project}" />
-								</pathconvert>
-				    			<echo message="... building ${proj-dir-@{proj}} ..." />
-								<shellscript shell="cmd.exe" tmpsuffix=".bat" dir="${proj-dir-@{proj}}" osfamily="windows" failonerror="true" >
-									<arg value="/c"/>
-									<arg value="call"/>
-									yo jhipster
-									if "%errorlevel%" == "0" yo jhipster:import-jdl @{proj}.jh
-						  		</shellscript>
-		    				</then>
-		    				<else>
-		    					<echo message="... building ${@{proj}-project} ..." />
-						  		<shellscript shell="bash" dir="${@{proj}-project}" osfamily="unix" failonerror="true" >
-						  			yo jhipster
-						  			if [ "$?" -eq "0" ]
-						  			then
-						  				yo jhipster:import-jdl @{proj}.jh
-						  			fi
-						  		</shellscript>
-		    				</else>
-		    			</if>
-    				</then>
-    			</if>
-    		</sequential>
-    	</for>
+	<!-- 从生成代码中获取需要的部分，并交给 gen.fix 处理 -->
+	<target name="gen.merge" depends="gen.merge.vo, gen.merge.bo, gen.merge.po">
+		<echo>merge target!</echo>
 	</target>
-
-	<target name="copysource" depends="require-properties,show-help,check-vbp-o-projects,save-new-jh,build-vbp-projects" >
+	
+	<target name="gen.merge.vo" if="is_vo" >
+		<echo message="合并 VO 层文件"/>
+        <copy todir="${source_merge_dir}">
+            <fileset dir="${output_dir}/target/vo/src" >
+            	<include name="main/java/**/domain/*VO.java" />
+            	<include name="main/java/**/web/rest/*VO*.java" />
+            	<include name="main/webapp/app/entities/*-vo/*.*" />
+            	<include name="main/webapp/bower_components/angular-i18n/*vo*.*" />
+            	<include name="main/webapp/i18n/**/*VO.json" />
+            	<include name="test/java/**/web/rest/*VO*Test.java" />
+            	<include name="test/javascript/spec/app/entities/*-vo/*.*" />
+            </fileset>
+        </copy>
+	</target>
+    
+    <target name="gen.merge.bo" if="is_bo" >
+        <echo message="合并 BO 层文件"/>
+        <copy todir="${source_merge_dir}">
+            <fileset dir="${output_dir}/target/bo/src" >
+                <include name="main/java/**/domain/*BO.java" />
+                <include name="main/java/**/service/**/*BO*.java" />
+                <include name="main/java/**/web/rest/*BO*.java" />
+                <include name="test/java/**/web/rest/*BO*Test.java" />
+            </fileset>
+        </copy>
+    </target>
+    
+    <target name="gen.merge.po" if="is_po" >
+        <echo message="合并 PO 层文件"/>
+        <copy todir="${source_merge_dir}">
+            <fileset dir="${output_dir}/target/po/src" >
+                <include name="main/java/**/domain/*PO.java" />
+                <include name="main/java/**/repository/*PORepository.java" />
+                <include name="main/java/**/service/dto/*PODTO.java" />
+                <include name="main/java/**/service/mapper/*POMapper.java" />
+            </fileset>
+        </copy>
+    </target>
+	
+	<target name="gen.merge1">
 		<echo message="========= 替换源文件开始 ======== " />
 		<echo message="引入文件"/>
 		<copy todir="${project_path}/target/tmp/src/main/webapp">
@@ -429,4 +541,13 @@
 		</copy>
 		<echo message="将替换好的文件放入工程开始结束"/>
 	</target>
+
+	<!-- 修复文件内部的链接关系，完成 vo-bo-po 的关联，确保没有编译错误 -->
+	<target name="gen.fix">
+	</target>
+	
+	<!-- 从文件内部提取自定义符号，提升数据转换的灵活性 -->
+	<target name="gen.improve">
+	</target>
+	
 </project>
