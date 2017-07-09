@@ -25,7 +25,7 @@
 	<target name="setenv.taskdef" depends="setenv.detect.sys, setenv.taskdef.maven, setenv.taskdef.ant">
 	</target>
 
-	<target name="setenv.taskdef.maven" if="is-in-maven">
+	<target name="setenv.taskdef.maven" if="${is-in-maven}">
 		<property name="plugin_classpath" refid="maven.plugin.classpath" />
 		<!-- 装入antlib库 -->
 		<taskdef resource="net/sf/antcontrib/antlib.xml" classpath="${plugin_classpath}"/>
@@ -76,6 +76,16 @@
 		<echo message="model input dir   = ${model_dir}" />
 		<echo message="output dir        = ${output_dir}" />
 		<echo message="package dir       = ${project_package_dir}" />
+		<echo>---------</echo>
+		<echo message="skip-build        = ${skip-build}" />
+		<echo message="skip-build-vo     = ${skip-build-vo}" />
+		<echo message="skip-build-bo     = ${skip-build-bo}" />
+		<echo message="skip-build-po     = ${skip-build-po}" />
+		
+		<echo message="force-build        = ${force-build}" />
+		<echo message="force-build-vo     = ${force-build-vo}" />
+		<echo message="force-build-bo     = ${force-build-bo}" />
+		<echo message="force-build-po     = ${force-build-po}" />
 	</target>
 
 	<target name="setenv.vars.defs">
@@ -94,7 +104,7 @@
         <record name="${basedir}/target/logs/generate.log" loglevel="${loglevel}" action="start"/>
     </target>
 
-	<target name="setenv.vars.maven" if="is-in-maven" depends="setenv.detect.sys, setenv.taskdef" >
+	<target name="setenv.vars.maven" if="${is-in-maven}" depends="setenv.detect.sys, setenv.taskdef" >
 		<property name="project_name" value="${maven.project.artifactId}" />
 
 		<propertyregex property="project_package"
@@ -142,24 +152,66 @@
 		<echo message="-Dskip-build-vo=true  跳过 vo 的构建"/>
 		<echo message="-Dskip-build-po=true  跳过 po 的构建"/>
 		<echo message="-Dskip-build-bo=true  跳过 bo 的构建"/>
+		<echo message="-Dforce-build=true     强制 vo, bo, po 的构建"/>
+		<echo message="-Dforce-build-vo=true  强制 vo 的构建"/>
+		<echo message="-Dforce-build-po=true  强制 po 的构建"/>
+		<echo message="-Dforce-build-bo=true  强制 bo 的构建"/>
     </target>
 
+	<target name="generate9" depends="setenv">
+		<loadfile property="vo_config_file"
+            srcfile="target/vo/src/main/java/com/fogsun/example/view/config/CacheConfiguration.java" >
+        </loadfile>
+		<echo>${vo_config_file}</echo>
+        <propertyregex property="vo_config_code" override="true"
+            input="${vo_config_file}"
+            regexp="User\.class\.getName.+\.persistent.+[\r\n]+([;\w\d\.\r\n\s\*@\(\)\{\}=,\&lt;\&gt;\-\+\&quot;]+)"
+            select="\1"
+            casesensitive="false" global="true" />
+        <!-- 
+                      regexp="package\s+[;\w\d\.\r\n\s\*@\(\)\{\}=,\&lt;\&gt;\-\+\&quot;]+User\.class\.getName\(\).+\.persistent.+$([.\r\n\s\w\(\),;\+\&quot;]+)^\s+// jhipster-needle\-ehcache\-add\-entry"
+        -->
+        <echo>
+        	============================================================================================
+        	${vo_config_code}
+            regexp="User\.class\.getName\(\).+\.persistent.+$([.\r\n\s\w\(\),;\+&quot;]+)^\s+// jhipster-needle\-ehcache\-add\-entry"
+        </echo>
+	</target>
+	
 	<target name="generate" depends="setenv, gen.mkdir, gen.yo_rc, gen.init">
 		<echo message="generate ..." />
 
-		<for list="vo,bo,po" param="layer">
+		<for list="base,vo,bo,po" param="layer">
   			<sequential>
 			  	<var name="target_layer" value="@{layer}" />
   				<var name="is_@{layer}" value="true" />
 				<if>
-					<and>
-						<isfalse value="${skip-build}" />
-						<isfalse value="${skip-build-@{layer}}" />
-					</and>
+					<or>
+						<!-- 如果有强迫生成 -->
+						<istrue value="${force-build}" />
+						<istrue value="${force-build-@{layer}}" />
+    					<and>
+    						<!-- 没有设置各种跳过 -->
+    						<isfalse value="${skip-build}" />
+    						<isfalse value="${skip-build-@{layer}}" />
+    						<!-- target中jdl文件存在而且model里的jdl更加新 -->
+    						<or>
+    							<not><available file="${output_dir}/${target_layer}/${project_name}.${target_layer}.jdl" /></not>
+    							<!-- 如果model中文件比target里的新 -->
+    							<uptodate srcfile="${model_dir}/${project_name}.${target_layer}.jdl" 
+    								targetfile="${output_dir}/${target_layer}/${project_name}.${target_layer}.jdl" />
+    						</or>
+    					</and>
+					</or>
 					<then>
 						<!-- 依次处理每一个层 -->
+						<echo>starting generating @{layer}: is_@{layer}=${is_@{layer}} ...</echo>
+						
 						<antcall target="gen.layer" >
 						</antcall>
+						
+          				<var name="is_@{layer}" value="false" />
+						<echo>finish generating @{layer}: is_@{layer}=${is_@{layer}} ...</echo>
 					</then>
 				</if>
   				<var name="is_@{layer}" value="false" />
@@ -221,10 +273,16 @@
 	<target name="gen.mkdir">
 		<mkdir dir="${output_dir}" />
 
+		<property name="base_dir" value="${output_dir}/base" />
 		<property name="vo_dir" value="${output_dir}/vo" />
 		<property name="bo_dir" value="${output_dir}/bo" />
 		<property name="po_dir" value="${output_dir}/po" />
-
+		
+		<property name="packagename.vo" value="view" />
+		<property name="packagename.bo" value="business" />
+		<property name="packagename.po" value="po" />
+		
+		<mkdir dir="${base_dir}" />
 		<mkdir dir="${vo_dir}" />
 		<mkdir dir="${bo_dir}" />
 		<mkdir dir="${po_dir}" />
@@ -237,14 +295,30 @@
 
 	<target name="gen.copy">
 		<!-- 复制当前工程的基本配置文件 -->
+		<echo>coping yo-rc</echo>
 		<copy file="${project_dir}/.yo-rc.json" todir="${output_dir}/${target_layer}" overwrite="true" />
-		<copy file="${model_dir}/${project_name}.${target_layer}.jdl" 
-			tofile="${output_dir}/${target_layer}/${project_name}.${target_layer}.jdl" 
-			overwrite="true" />
-
+		<!-- 复制 jdl 文件，除了生成 base 结构 -->
+		<if>
+			<not><equals arg1="${target_layer}" arg2="base" /></not>
+			<then>
+				<echo>copy ${project_name}.${target_layer}.jdl </echo>
+        		<copy file="${model_dir}/${project_name}.${target_layer}.jdl" 
+        			tofile="${output_dir}/${target_layer}/${project_name}.${target_layer}.jdl" 
+        			overwrite="true" />
+				<!-- 让不同的层生成内容在不同的命名空间中 -->
+				<propertycopy name="layer_ns" from="packagename.${target_layer}" />
+				<replace file="${output_dir}/${target_layer}/.yo-rc.json" 
+					token="${project_package}" 
+					value="${project_package}.${layer_ns}"/>
+				<replace file="${output_dir}/${target_layer}/.yo-rc.json" 
+					token="${project_package_dir}" 
+					value="${project_package_dir}/${layer_ns}"/>
+			</then>
+		</if>
 		<if>
 			<not><available file="${output_dir}/${target_layer}/node_modules" type="dir" /></not>
 			<then>
+				<echo>linking node_modules</echo>
 				<!-- 准备链接 node_modules -->
 				<antcall target="tool.link">
 					<param name="from.dir" value="${project_dir}/node_modules"/>
@@ -270,8 +344,10 @@
 							<arg value="call"/>
 							yo jhipster --force
 							if "%errorlevel%" == "0" (
-							    echo ================generate from ${project_name}.@{proj}.jdl======================
-							    yo jhipster:import-jdl ${project_name}.@{proj}.jdl --force
+							    if exist "${project_name}.@{proj}.jdl" (    
+							        echo ================generate from ${project_name}.@{proj}.jdl======================
+							        yo jhipster:import-jdl ${project_name}.@{proj}.jdl --force
+							    )
 							)
 						</shellscript>
 					</then>
@@ -279,7 +355,7 @@
 						<echo message="... building @{proj} ..." />
 						<shellscript shell="bash" dir="${output_dir}/${target_layer}" osfamily="unix" failonerror="true" >
 							yo jhipster --force
-							if [ "$?" -eq "0" ]
+							if [ "$?" -eq "0"  -a  -f "${project_name}.@{proj}.jdl" ]
 							then
 							    echo "================generate from ${project_name}.@{proj}.jdl======================"
 								yo jhipster:import-jdl ${project_name}.@{proj}.jdl --force
@@ -287,43 +363,46 @@
 						</shellscript>
 					</else>
 				</if>
+				<echo>building filished!</echo>
 			</sequential>
 		</for>
-		<!-- 判断 project目录 是否包含源代码, 如果没有则复制一个 -->
-        <if>
-            <and>
-                <not><available file="${project_dir}/mvnw" /></not>
-            </and>
-            <then>
-            	<echo>copy files for init</echo>
-                <copy todir="${project_dir}" overwrite="false" >
-            	    <fileset dir="${output_dir}/${target_layer}">
-            	    	<exclude name="*.jdl"/>
-            	    	<exclude name="*.jh"/>
-            	        <exclude name="pom.xml"/>
-            	    	<exclude name=".yo-rc.json"/>
-            	    	<exclude name="target" />
-            	    	<exclude name="node_modules" />
-            	    </fileset>
-                </copy>
-            </then>
-        </if>
 		
-		<!-- 判断是否存在project目录的 node_modules,如果没有则移动一个，且为当前处理建立link -->
 		<if>
-			<and>
-				<not><available file="${project_dir}/node_modules" /></not>
-				<available file="${output_dir}/${target_layer}/node_modules" />
-			</and>
+			<istrue value="${is_base}" />
 			<then>
-				<echo>moving node_modules for standard</echo>
-				<move file="${output_dir}/${target_layer}/node_modules" tofile="${project_dir}/node_modules" />
-    			<antcall target="tool.link">
-					<param name="from.dir" value="${project_dir}/node_modules"/>
-					<param name="to.link" value="${output_dir}/${target_layer}/node_modules"/>
-				</antcall>
+        		<antcall target="gen.base.post-gen">
+        		</antcall>
 			</then>
 		</if>
+	</target>
+	
+	<target name="gen.base.post-gen" >
+    	<echo>copy files for init, ${is_base} </echo>
+        <copy todir="${project_dir}" overwrite="false" >
+    	    <fileset dir="${output_dir}/${target_layer}">
+    	    	<exclude name="*.jdl"/>
+    	    	<exclude name="*.jh"/>
+    	        <exclude name="pom.xml"/>
+    	    	<exclude name=".yo-rc.json"/>
+    	    	<exclude name="target/**/*.*" />
+    	    	<exclude name="node_modules/**/*.*" />
+    	    </fileset>
+        </copy>
+        <!-- 判断是否存在project目录的 node_modules,如果没有则移动一个，且为当前处理建立link -->
+        <if>
+            <and>
+                <not><available file="${project_dir}/node_modules" /></not>
+                <available file="${output_dir}/${target_layer}/node_modules" />
+            </and>
+            <then>
+                <echo>moving node_modules for standard</echo>
+                <move file="${output_dir}/${target_layer}/node_modules" tofile="${project_dir}/node_modules" />
+                <antcall target="tool.link">
+                    <param name="from.dir" value="${project_dir}/node_modules"/>
+                    <param name="to.link" value="${output_dir}/${target_layer}/node_modules"/>
+                </antcall>
+            </then>
+        </if>
 	</target>
 
 	<target name="tool.link">
@@ -332,6 +411,7 @@
 			<and>
 				<available file="${from.dir}" type="dir" />
 				<not><available file="${to.link}" type="dir" /></not>
+				<not><available file="${to.link}" type="file" /></not>
 			</and>
 			<then>
 				<echo message="... linking ${from.dir} to ${to.link} ..." />
@@ -357,53 +437,108 @@
 		<echo>merge target!</echo>
 	</target>
 	
-	<target name="gen.merge.vo" if="is_vo" >
-		<echo message="合并 VO 层文件"/>
+	<target name="gen.merge.vo" if="${is_vo}" >
+		<if>
+			<isfalse value="${is_vo}" />
+			<then>
+				<fail message="is_vo == false " />
+			</then>
+		</if>
+		<fail message="assert is_vo=false" unless="is_vo" />
+		
+		<echo message="合并 View 层文件"/>
         <copy todir="${source_merge_dir}">
-            <fileset dir="${output_dir}/target/vo/src" >
-            	<include name="main/java/**/domain/*VO.java" />
-            	<include name="main/java/**/web/rest/*VO*.java" />
-            	<include name="main/webapp/app/entities/*-vo/*.*" />
-            	<include name="main/webapp/bower_components/angular-i18n/*vo*.*" />
-            	<include name="main/webapp/i18n/**/*VO.json" />
-            	<include name="test/java/**/web/rest/*VO*Test.java" />
-            	<include name="test/javascript/spec/app/entities/*-vo/*.*" />
+            <fileset dir="${output_dir}/vo/src" >
+            	<!-- 包含界面html、语言包和restful代码 -->
+            	<include name="main/webapp/app/entities/*-view/*.*" />
+            	<include name="main/webapp/i18n/**/*.*" />
+            	<include name="main/webapp/app/layouts/navbar/navbar.html" />
+            	<include name="main/webapp/index.html" />
+            	<!-- 后台代码 -->
+            	<include name="main/java/**/view/web/rest/*ViewResource.java" />
+            	<include name="main/java/**/service/*ViewService.java" />
+            	<include name="main/java/**/service/impl/*ViewServiceImpl.java" />
+            	<include name="main/java/**/service/dto/*ViewDTO.java" />
+            	<include name="main/java/**/service/mapper/EntityMapper.java" />
+            	<include name="main/java/**/service/mapper/*ViewMapper.java" />
+            	<!--  -->
+            	<!-- 包含界面测试用例 -->
+            	<include name="test/java/**/view/web/rest/*View*Test.java" />
+            	<include name="test/javascript/spec/app/entities/*-view/*.*" />
             </fileset>
         </copy>
 	</target>
     
-    <target name="gen.merge.bo" if="is_bo" >
+	<!-- 修复 VO 内部的链接关系，确保没有编译错误 
+	*.config.CacheConfiguration.java需要插入关联内容, // jhipster-needle-ehcache-add-entry
+	-->
+    <target name="gen.fix.vo" if="${is_vo}"  >
+    	<!-- 装入 CacheConfiguration 中的新内容，然后添加到原来的同名文件中 -->
+    	<loadfile property="vo_config_file"
+    		srcfile="${output_dir}/vo/src/main/java/${project_package_dir}/view/config/CacheConfiguration.java" >
+        </loadfile>
+    	<propertyregex property="vo_config_code" override="true"
+    	            input="${vo_config_file}"
+    	            regexp="User\.class\.getName.+\.persistent.+[\r\n]+([;\w\d\.\r\n\s\*@\(\)\{\}=,\&lt;\&gt;\-\+\&quot;]+)"
+    	            select="\1"
+    	            casesensitive="false" global="true" />
+    	
+    	<echo>${vo_config_code}</echo>
+    	<replaceregexp 
+    		match="(^\s+// jhipster-needle\-ehcache\-add\-entry\s*$)" 
+    		replace="${vo_config_code}\1" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/config" includes="CacheConfiguration.java" />
+        </replaceregexp>
+    	<!-- 替换 Mapper 将 ViewDTO 转到 Business DTO -->
+    	<!-- 替换 ViewServiceImpl 中的 ViewRepository 转到 BusinessService -->
+    	<!--  -->
+    	<!--  -->
+    	<!--  -->
+    	<!--  -->
+    	<!--  -->
+    	<!--  -->
+    </target>
+	
+    <target name="gen.merge.bo" if="${is_bo}" >
         <echo message="合并 BO 层文件"/>
         <copy todir="${source_merge_dir}">
-            <fileset dir="${output_dir}/target/bo/src" >
-                <include name="main/java/**/domain/*BO.java" />
-                <include name="main/java/**/service/**/*BO*.java" />
-                <include name="main/java/**/web/rest/*BO*.java" />
-                <include name="test/java/**/web/rest/*BO*Test.java" />
+            <fileset dir="${output_dir}/bo/src" >
+                <include name="main/java/**/business/domain/*BO.java" />
+                <include name="main/java/**/business/service/**/*BO*.java" />
+                <include name="main/java/**/business/web/rest/*BO*.java" />
+                <include name="test/java/**/business/web/rest/*BO*Test.java" />
             </fileset>
         </copy>
     </target>
     
-    <target name="gen.merge.po" if="is_po" >
+    <!-- 修复 BO 内部的链接关系，确保没有编译错误 -->
+    <target name="gen.fix.bo" if="${is_bo}"  >
+    </target>
+    
+    <target name="gen.merge.po" if="${is_po}" >
         <echo message="合并 PO 层文件"/>
         <copy todir="${source_merge_dir}">
-            <fileset dir="${output_dir}/target/po/src" >
-                <include name="main/java/**/domain/*PO.java" />
-                <include name="main/java/**/repository/*PORepository.java" />
-                <include name="main/java/**/service/dto/*PODTO.java" />
-                <include name="main/java/**/service/mapper/*POMapper.java" />
+            <fileset dir="${output_dir}/po/src" >
+                <include name="main/java/**/po/repository/*PORepository.java" />
+                <include name="main/java/**/po/service/mapper/*POMapper.java" />
             </fileset>
         </copy>
     </target>
+	
+    <!-- 修复 PO 内部的链接关系，确保没有编译错误 -->
+    <target name="gen.fix.po" if="${is_po}"  >
+    </target>
+    
+	
 	
 	<target name="gen.merge1">
 		<echo message="========= 替换源文件开始 ======== " />
 		<echo message="引入文件"/>
 		<copy todir="${project_path}/target/tmp/src/main/webapp">
-			<fileset dir="${vo-project}/src/main/webapp" />
+			<fileset dir="${view-project}/src/main/webapp" />
 		</copy>
 		<copy todir="${project_path}/target/tmp/src/main/java/com/apusic/aip/web/rest">
-			<fileset dir="${vo-project}/src/main/java/com/apusic/aip/web/rest" />
+			<fileset dir="${view-project}/src/main/java/com/apusic/aip/web/rest" />
 		</copy>
 		<copy todir="${project_path}/target/tmp/src/main/java/com/apusic/aip/domain" overwrite="true" force="true" preservelastmodified="true">
 			<fileset dir="${bo-project}/src/main/java/com/apusic/aip/domain" />
@@ -413,7 +548,7 @@
 			<fileset dir="${po-project}/src/main/java/com/apusic/aip/repository" />
 		</copy>
 		<copy todir="${project_path}/target/tmp/src/main/java/com/apusic/aip" overwrite="true" force="true" preservelastmodified="true">
-			<fileset dir="${vo-project}/src/main/java/com/apusic/aip/">
+			<fileset dir="${view-project}/src/main/java/com/apusic/aip/">
 				<include name="service/*"/>
 				<include name="service/dto/"/>
 				<include name="service/impl/"/>
@@ -430,19 +565,19 @@
 		</copy>
 		<echo message="引入文件结束"/>
 		<echo message="备份文件开始"/>
-		<copy todir="${project_path}/target/vo-translate-bak/webapp" overwrite="true">
+		<copy todir="${project_path}/target/view-translate-bak/webapp" overwrite="true">
 			<fileset dir="${project_path}/target/tmp/src/main/webapp" />
 		</copy>
-		<copy todir="${project_path}/target/vo-translate-bak/rest" overwrite="true">
+		<copy todir="${project_path}/target/view-translate-bak/rest" overwrite="true">
 			<fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/web/rest" />
 		</copy>
-		<copy todir="${project_path}/target/vo-translate-bak/domain" overwrite="true">
+		<copy todir="${project_path}/target/view-translate-bak/domain" overwrite="true">
 			<fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/domain" />
 		</copy>
-		<copy todir="${project_path}/target/vo-translate-bak/repository" overwrite="true">
+		<copy todir="${project_path}/target/view-translate-bak/repository" overwrite="true">
 			<fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/repository" />
 		</copy>
-		<copy todir="${project_path}/target/vo-translate-bak/service" overwrite="true">
+		<copy todir="${project_path}/target/view-translate-bak/service" overwrite="true">
 			<fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service" />
 		</copy>
 		<echo message="备份文件结束"/>
@@ -543,7 +678,7 @@
 	</target>
 
 	<!-- 修复文件内部的链接关系，完成 vo-bo-po 的关联，确保没有编译错误 -->
-	<target name="gen.fix">
+	<target name="gen.fix" depends="gen.fix.vo, gen.fix.bo, gen.fix.po" >
 	</target>
 	
 	<!-- 从文件内部提取自定义符号，提升数据转换的灵活性 -->
