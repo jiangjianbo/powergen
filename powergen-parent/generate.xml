@@ -12,7 +12,7 @@
 
 	脚本会使用如下的属性变量，在maven环境下运行会自动生成这些属性值，非maven环境下从 powergen.properties 中获取：
 		project_name     工程的名字， 默认是 project.artifactId
-		project_package  工程的命名空间，默认是 project.groupId + project.artifactId
+		project_package  工程的命名空间，默认是 project.groupId 
 		project_dir      工程根目录，默认是 pom.xml 的目录
 		output_dir       输出目录位置，存放各种中间状态的输出，默认是 target
 		source_merge_dir 生成的代码最终合并到的目录位置，默认是 src/main/java 
@@ -77,15 +77,21 @@
         <echo message="output dir        = ${output_dir}" />
         <echo message="package dir       = ${project_package_dir}" />
         <echo>---------</echo>
+        <echo message="clean-gen-source  = ${clean-gen-source}" />
         <echo message="skip-build        = ${skip-build}" />
         <echo message="skip-build-vo     = ${skip-build-vo}" />
         <echo message="skip-build-bo     = ${skip-build-bo}" />
         <echo message="skip-build-po     = ${skip-build-po}" />
-
-        <echo message="force-build        = ${force-build}" />
-        <echo message="force-build-vo     = ${force-build-vo}" />
-        <echo message="force-build-bo     = ${force-build-bo}" />
-        <echo message="force-build-po     = ${force-build-po}" />
+        <echo>---------</echo>
+        <echo message="force-build       = ${force-build}" />
+        <echo message="force-build-vo    = ${force-build-vo}" />
+        <echo message="force-build-bo    = ${force-build-bo}" />
+        <echo message="force-build-po    = ${force-build-po}" />
+        <echo>---------</echo>
+        <echo message="skip-gen          = ${skip-gen}" />
+        <echo message="skip-gen-vo       = ${skip-gen-vo}" />
+        <echo message="skip-gen-bo       = ${skip-gen-bo}" />
+        <echo message="skip-gen-po       = ${skip-gen-po}" />
     </target>
 
     <target name="setenv.vars.defs">
@@ -93,10 +99,22 @@
 
         <property environment="env" />
 
+        <property name="clean-gen-source" value="false" />
+        
         <property name="skip-build" value="false" />
         <property name="skip-build-vo" value="false" />
         <property name="skip-build-bo" value="false" />
         <property name="skip-build-po" value="false" />
+
+        <property name="force-build" value="false" />
+        <property name="force-build-vo" value="false" />
+        <property name="force-build-bo" value="false" />
+        <property name="force-build-po" value="false" />
+
+        <property name="skip-gen" value="false" />
+        <property name="skip-gen-vo" value="false" />
+        <property name="skip-gen-bo" value="false" />
+        <property name="skip-gen-po" value="false" />
     </target>
 
     <target name="setenv.options">
@@ -108,11 +126,11 @@
         <property name="project_name" value="${maven.project.artifactId}" />
 
         <propertyregex property="project_package"
-                       input="${maven.project.groupId}.${maven.project.artifactId}"
+                       input="${maven.project.groupId}"
                        regexp="\-"
                        replace="_"
                        global="true"
-                       defaultValue="${maven.project.groupId}.${maven.project.artifactId}" />
+                       defaultValue="${maven.project.groupId}" />
 
         <property name="project_dir" value="${basedir}" />
         <property name="output_dir" value="${basedir}/target" />
@@ -156,31 +174,89 @@
         <echo message="-Dforce-build-vo=true  强制 vo 的构建" />
         <echo message="-Dforce-build-po=true  强制 po 的构建" />
         <echo message="-Dforce-build-bo=true  强制 bo 的构建" />
+        <echo message="-Dskip-gen=true     跳过 vo, bo, po 的代码生成" />
+        <echo message="-Dskip-gen-vo=true  跳过 vo 的代码生成" />
+        <echo message="-Dskip-gen-po=true  跳过 po 的代码生成" />
+        <echo message="-Dskip-gen-bo=true  跳过 bo 的代码生成" />
     </target>
 
-    <target name="generate9" depends="setenv">
-        <loadfile property="vo_config_file"
-                  srcfile="target/vo/src/main/java/com/fogsun/example/view/config/CacheConfiguration.java">
-        </loadfile>
-        <echo>${vo_config_file}</echo>
-        <propertyregex property="vo_config_code"
-                       override="true"
-                       input="${vo_config_file}"
-                       regexp="User\.class\.getName.+\.persistent.+[\r\n]+([;\w\d\.\r\n\s\*@\(\)\{\}=,\&lt;\&gt;\-\+\&quot;]+)"
-                       select="\1"
-                       casesensitive="false"
-                       global="true" />
-        <!-- 
-                      regexp="package\s+[;\w\d\.\r\n\s\*@\(\)\{\}=,\&lt;\&gt;\-\+\&quot;]+User\.class\.getName\(\).+\.persistent.+$([.\r\n\s\w\(\),;\+\&quot;]+)^\s+// jhipster-needle\-ehcache\-add\-entry"
-        -->
-        <echo>
-        	============================================================================================
-        	${vo_config_code}
-            regexp="User\.class\.getName\(\).+\.persistent.+$([.\r\n\s\w\(\),;\+&quot;]+)^\s+// jhipster-needle\-ehcache\-add\-entry"
-        </echo>
+    <target name="clean" depends="setenv">
+        <echo>clean generated sources in src/ directory by -Dpowergen.fullclean=true</echo>
+        <echo>clean above and node_modules/ by -Dpowergen.deepclean=true</echo>
+        <!-- if -Dpowergen.fullclean=true then clear copied source -->
+        <if>
+            <or>
+                <istrue value="${powergen.fullclean}" />
+                <istrue value="${powergen.deepclean}" />
+            </or>
+            <then>
+                <var name="gen.clean-gen" value="true"/>
+                <antcall target="gen.clean-gen">
+                </antcall>
+                <!-- 删除 node-modules -->
+                <if>
+                    <istrue value="${powergen.deepclean}" />
+                    <then>
+                        <antcall target="tool.removelink">
+                            <param name="from.dir" value="${project_dir}/node_modules" />
+                        </antcall>
+                        <delete quiet="false" failonerror="false" verbose="false" removeNotFollowedSymlinks="true" includeemptydirs="true" >
+                            <fileset dir="${project_dir}" defaultexcludes="no" >
+                                <include name="node_modules/**/*" />
+                            </fileset>
+                        </delete>
+                        <delete quiet="false" failonerror="false" verbose="false" removeNotFollowedSymlinks="true" includeemptydirs="true" >
+                            <dirset dir="${project_dir}" defaultexcludes="no" >
+                                <include name="node_modules/**" />
+                            </dirset>
+                        </delete>
+                    </then>
+                </if>
+            </then>
+        </if>
+                
+    </target>    
+    
+    <!-- 先清除复制到src中的源代码 -->
+    <target name="gen.clean-gen" if="${clean-gen-source}">
+        <echo>cleaning generated files in src/ ... </echo>
+        <delete quiet="false" failonerror="false" verbose="true" removeNotFollowedSymlinks="true" >
+            <fileset dir="${project_dir}" followsymlinks="false" >
+                <include name="*.*" />
+                <include name="*" />
+                <include name="**/*" />
+                <include name="**/*.*" />
+                <exclude name="node_modules/**/*" />
+                <exclude name="node_modules/**/*.*" />
+                <exclude name="node_modules/**/.*" />
+                <exclude name="pom.xml" />
+                <exclude name="generate.properties" />
+                <exclude name=".yo-rc.json" />
+                <exclude name="src/main/model/**/*" />
+                <exclude name="src/main/model/**/*.*" />
+                <exclude name="target/**/*" />
+                <exclude name=".idea/**/*" />
+                <exclude name="*.iml" />
+                <exclude name=".settings/**/*" />
+                <exclude name="*.project" />
+                <exclude name="*.classpath" />
+            </fileset>
+        </delete>
+        <delete quiet="false" failonerror="false" verbose="true" removeNotFollowedSymlinks="true" includeemptydirs="true" >
+            <dirset dir="${project_dir}" defaultexcludes="no" >
+                <include name="*" />
+                <include name="*.*" />
+                <include name="**" />
+                <exclude name="node_modules/**" />
+                <exclude name="src/main/model/**" />
+                <exclude name="target" />
+                <exclude name=".idea" />
+                <exclude name=".settings" />
+            </dirset>
+        </delete>
     </target>
-
-    <target name="generate" depends="setenv, gen.mkdir, gen.yo_rc, gen.init">
+    
+    <target name="generate" depends="setenv, gen.mkdir, gen.yo_rc, gen.init, gen.clean-gen">
         <echo message="generate ..." />
 
         <for list="vo,bo,po" param="layer">
@@ -208,12 +284,24 @@
                         </and>
                     </or>
                     <then>
+                        <var name="can_gen" value="true" />
+                        <if>
+                            <or>
+                                <istrue value="${skip-gen}" />
+                                <istrue value="${skip-gen-@{layer}}" />
+                            </or>
+                            <then>
+                                <echo>ignore generate @{layer} when skip-gen=${skip-gen} or skip-gen-@{layer}=${skip-gen-@{layer}}</echo>
+                                <var name="can_gen" value="false" />
+                            </then>
+                        </if>
                         <!-- 依次处理每一个层 -->
                         <echo>starting generating @{layer}: is_@{layer}=${is_@{layer}} ...</echo>
 
                         <antcall target="gen.layer">
                         </antcall>
 
+                        <var name="can_gen" value="false" />
                         <var name="is_@{layer}" value="false" />
                         <echo>finish generating @{layer}: is_@{layer}=${is_@{layer}} ...</echo>
                     </then>
@@ -295,7 +383,7 @@
 
     </target>
 
-    <target name="gen.copy">
+    <target name="gen.copy" if="${can_gen}">
         <!-- 复制当前工程的基本配置文件 -->
         <echo>coping yo-rc</echo>
         <copy file="${project_dir}/.yo-rc.json" todir="${output_dir}/${target_layer}" overwrite="true" />
@@ -329,7 +417,7 @@
         </if>
     </target>
 
-    <target name="gen.build">
+    <target name="gen.build" if="${can_gen}">
         <!-- 只有没设置 skip-build-XX 的时候才运行 -->
         <for list="${target_layer}" param="proj">
             <sequential>
@@ -389,17 +477,6 @@
     </target>
 
     <target name="gen.vo.post-gen">
-        <echo>copy files for init, ${is_vo} </echo>
-        <copy todir="${project_dir}" overwrite="false">
-            <fileset dir="${output_dir}/${target_layer}">
-                <exclude name="*.jdl" />
-                <exclude name="*.jh" />
-                <exclude name="pom.xml" />
-                <exclude name=".yo-rc.json" />
-                <exclude name="target/**/*.*" />
-                <exclude name="node_modules/**/*.*" />
-            </fileset>
-        </copy>
         <!-- 判断是否存在project目录的 node_modules,如果没有则移动一个，且为 vo 建立 link -->
         <if>
             <and>
@@ -410,7 +487,7 @@
             </and>
             <then>
                 <echo>moving node_modules for standard</echo>
-                <move todir="${project_dir}" >
+                <move todir="${project_dir}/node_modules" >
                     <dirset dir="${output_dir}/${target_layer}/node_modules" />
                 </move>
                 <antcall target="tool.link">
@@ -465,6 +542,39 @@
         </if>
     </target>
 
+    <target name="tool.removelink">
+        <echo message="... remove links from ${from.dir} ..." />
+        <pathconvert property="local-dir" targetos="windows">
+            <path location="${from.dir}" />
+        </pathconvert>
+        <exec dir="${from.dir}" outputproperty="symlinks" executable="cmd.exe" osfamily="windows" failonerror="true">
+            <arg line='/c dir /A:L /b /s "${local-dir}" ' />
+        </exec>
+        <exec dir="${from.dir}" outputproperty="symlinks" executable="bash" osfamily="unix" failonerror="true">
+            <arg value="-c"/>
+            <arg value="find . -type l"/>
+        </exec>
+
+        <echo>[${symlinks}]</echo>
+        <for list="${symlinks}" delimiter="${line.separator}" param="link" >
+            <sequential>
+                <if>
+                    <istrue value="${is-windows-os}" />
+                    <then>
+                        <echo>delete symbolic link @{link}</echo>
+                        <delete file="@{link}" removeNotFollowedSymlinks="true" verbose="true" />  
+                    </then>
+                    <else>
+                        <echo>delete symbolic link ${from.dir}/@{link}</echo>
+                        <delete file="${from.dir}/@{link}" removeNotFollowedSymlinks="true" verbose="true" />                    
+                    </else>
+                </if>
+            </sequential>
+        </for>    
+
+    </target>
+
+
     <!-- 从生成代码中获取需要的部分，并交给 gen.fix 处理 -->
     <target name="gen.merge" depends="gen.merge.vo, gen.merge.bo, gen.merge.po">
         <echo>merge target!</echo>
@@ -479,27 +589,85 @@
         </if>
         <fail message="assert is_vo=false" unless="is_vo" />
 
-        <echo message="合并 View 层文件" />
-        <copy todir="${source_merge_dir}" verbose="true" >
-            <fileset dir="${output_dir}/vo/src">
-                <!-- 包含界面html、语言包和restful代码，要根据名字选择 View的操作视图对象 -->
-                <include name="main/webapp/app/entities/*-view/*.*" />
-                <include name="main/webapp/i18n/**/*.*" />
-                <include name="main/webapp/app/layouts/navbar/navbar.html" />
-                <include name="main/webapp/index.html" />
-                <!-- 后台代码，复制rest，service，mapper，且将DTO改成 View对象 -->
-                <include name="main/java/${project_package_dir}/view/web/rest/*ViewResource.java" />
-                <include name="main/java/${project_package_dir}/view/service/*ViewService.java" />
-                <include name="main/java/${project_package_dir}/view/service/impl/*ViewServiceImpl.java" />
-                <include name="main/java/${project_package_dir}/view/service/mapper/EntityMapper.java" />
-                <include name="main/java/${project_package_dir}/view/service/mapper/*ViewMapper.java" />
-                <include name="main/java/${project_package_dir}/view/service/dto/*ViewDTO.java" />
-                <!--  -->
-                <!-- 包含界面测试用例 -->
-                <include name="test/java/**/view/web/rest/*View*Test.java" />
-                <include name="test/javascript/spec/app/entities/*-view/*.*" />
+        <echo>copy project files for init</echo>
+        <copy todir="${project_dir}" overwrite="false">
+            <fileset dir="${output_dir}/${target_layer}">
+                <include name="**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/view/service/*.java" />
+                <exclude name="*.jdl" />
+                <exclude name="*.jh" />
+                <exclude name="pom.xml" />
+                <exclude name=".yo-rc.json" />
+                <exclude name="target/**/*.*" />
+                <exclude name="node_modules/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/view/domain/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/view/repository/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/view/aop/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/view/config/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/view/util/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/view/security/**/*.*" />
             </fileset>
         </copy>
+        <copy todir="${source_merge_dir}/main/java/${project_package_dir}/" verbose="true" >
+            <fileset dir="${output_dir}/${target_layer}/src/main/java/${project_package_dir}/view">
+                <include name="security/**/*.*" />
+                <!-- CacheConfiguration用 PO 的 -->
+                <exclude name="security/CacheConfiguration.java" />
+            </fileset>
+            <fileset dir="${output_dir}/${target_layer}/src/main/java/${project_package_dir}">
+                <include name="view/service/*ViewService.java" />
+            </fileset>
+        </copy>
+        
+        <!-- 备份原始pom文件 -->
+        <if>
+            <not>
+                <available file="${project_dir}/pom.origin.xml" />
+            </not>
+            <then>
+                <echo message="备份原始pom文件" />
+                <move file="${project_dir}/pom.xml" tofile="${project_dir}/pom.origin.xml" />
+                <copy file="${output_dir}/${target_layer}/pom.xml" tofile="${project_dir}/pom.xml" />
+                <property name="parent_ref" ><![CDATA[
+    <parent>
+        <groupId>com.github.powergen</groupId>
+        <artifactId>powergen-parent</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../powergen-parent/pom.xml</relativePath>
+    </parent> 
+                    ]]>
+                </property>
+                <!-- 替换parent部分内容  -->
+                <replaceregexp match="\&lt;parent\&gt;[\w\d\-\&gt;\&lt;\.\r\n\s/]+\&lt;/parent\&gt;" replace="${parent_ref}" flags="gm">
+                    <fileset dir="${project_dir}" includes="pom.xml" />
+                </replaceregexp>  
+                <!-- 修改 groupId 和 artifactId -->
+                <replaceregexp match="${project_package}.view" replace="${project_package}" flags="gm">
+                    <fileset dir="${project_dir}" includes="pom.xml" />
+                </replaceregexp>  
+            </then>
+        </if>
+        <echo message="删除不必要的 View 层文件" />
+        <delete verbose="true" >
+            <dirset dir="${source_merge_dir}">
+                <include name="main/java/${project_package_dir}/view/domain/**" />
+                <include name="main/java/${project_package_dir}/view/repository/**" />
+                <include name="main/java/${project_package_dir}/view/aop/**" />
+                <include name="main/java/${project_package_dir}/view/config/**" />
+                <include name="main/java/${project_package_dir}/view/util/**" />
+            </dirset>
+            <fileset dir="${source_merge_dir}">
+                <include name="main/java/${project_package_dir}/view/domain/*.*" />
+                <include name="main/java/${project_package_dir}/view/repository/*.*" />
+                <include name="main/java/${project_package_dir}/view/aip/**/*.*" />
+                <include name="main/java/${project_package_dir}/view/config/**/*.*" />
+                <include name="main/java/${project_package_dir}/view/util/*.*" />
+                <include name="main/java/${project_package_dir}/view/service/UserService.java" />
+                <include name="main/java/${project_package_dir}/view/service/MailService.java" />
+                <include name="main/java/${project_package_dir}/view/service/AuditEventService.java" />
+            </fileset>
+        </delete>
+        <!-- 将DTO改成 View对象 -->
         <move todir="${source_merge_dir}" verbose="true" >
             <fileset dir="${source_merge_dir}">
                 <include name="main/java/${project_package_dir}/view/service/dto/*ViewDTO.java" />
@@ -512,48 +680,38 @@
 	*.config.CacheConfiguration.java需要插入关联内容, // jhipster-needle-ehcache-add-entry
 	-->
     <target name="gen.fix.vo" if="${is_vo}">
-        <!-- 装入 CacheConfiguration 中的新内容，然后添加到原来的同名文件中 -->
-        <loadfile property="vo_config_file"
-                  srcfile="${output_dir}/vo/src/main/java/${project_package_dir}/view/config/CacheConfiguration.java">
-        </loadfile>
-        <propertyregex property="vo_config_code"
-                       override="true"
-                       input="${vo_config_file}"
-                       regexp="User\.class\.getName.+\.persistent.+[\r\n]+([;\w\d\.\r\n\s\*@\(\)\{\}=,\&lt;\&gt;\-\+\&quot;]+)"
-                       select="\1"
-                       casesensitive="false"
-                       global="true" />
-
-        <echo>vo_config_code=[${vo_config_code}]</echo>
-        <replaceregexp match="(^\s+// jhipster-needle\-ehcache\-add\-entry\s*$)"
-                       replace="${vo_config_code}\1"
-                       flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/config"
-                     includes="CacheConfiguration.java" />
-        </replaceregexp>
         <!-- 将所有的 View 替换成 Business,同时修改import *.view.domain.*View 转到 *.business.domain.*BO -->
         <replaceregexp match="(\w+)View\b" replace="\1BO" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
         </replaceregexp>
         <replaceregexp match="\.view\.domain\.(\w+)BO" replace=".business.domain.\1BO" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+        </replaceregexp>
+        <replaceregexp match="\.view\.domain\." replace=".business.domain." flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+        </replaceregexp>
+        <replaceregexp match="\.view\.security\b" replace=".security" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/security" includes="**/*.java" />
         </replaceregexp>
         <!-- 将 ViewDTO 转到 View -->
         <replaceregexp match="(\w+)ViewDTO\b" replace="\1View" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
         </replaceregexp>
         <!-- 替换 ViewServiceImpl 中的 ViewRepository 转到 BusinessService -->
         <replaceregexp match="(\w+)ViewRepository" replace="\1BOService" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
         </replaceregexp>
-        <replaceregexp match="\.view.repository\.(\w+)ViewRepository"
+        <replaceregexp match="\.view\.repository\.(\w+)BOService"
                        replace=".business.service.\1BOService"
                        flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
         </replaceregexp>
-        <!--  -->
-        <!--  -->
-        <!--  -->
+        <replaceregexp match="\.\w+\.service\.((MailService)|(UserService)|(AuditEventService))\b"
+                       replace=".business.service.\1"
+                       flags="g">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+        </replaceregexp>
         <!--  -->
         <!--  -->
         <!--  -->
@@ -564,9 +722,15 @@
         <copy todir="${source_merge_dir}" verbose="true" >
             <fileset dir="${output_dir}/bo/src">
                 <include name="main/java/${project_package_dir}/business/domain/*BO.java" />
-                <include name="main/java/${project_package_dir}/business/service/**/*BO*.java" />
-                <include name="main/java/${project_package_dir}/business/service/mapper/EntityMapper.java" />
+                <include name="main/java/${project_package_dir}/business/service/**/*.java" />
                 <exclude name="main/java/${project_package_dir}/business/service/dto/*.java" />
+            </fileset>
+        </copy>
+        <copy todir="${source_merge_dir}/main/java/${project_package_dir}" verbose="true" >
+            <fileset dir="${output_dir}/bo/src/main/java/${project_package_dir}/business">
+                <include name="aop/**/*.java" />
+                <include name="config/**/*.java" />
+                <include name="util/**/*.java" />
             </fileset>
         </copy>
     </target>
@@ -574,6 +738,7 @@
     <!-- 修复 BO 内部的链接关系，确保没有编译错误 -->
     <target name="gen.fix.bo" if="${is_bo}">
         <!-- 装入 CacheConfiguration 中的新内容，然后添加到原来的同名文件中 -->
+        <!--
         <loadfile property="bo_config_file"
                   srcfile="${output_dir}/bo/src/main/java/${project_package_dir}/business/config/CacheConfiguration.java">
         </loadfile>
@@ -589,237 +754,117 @@
         <replaceregexp match="(^\s+// jhipster-needle\-ehcache\-add\-entry\s*$)"
                        replace="${bo_config_code}\1"
                        flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/config"
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view/config"
                      includes="CacheConfiguration.java" />
         </replaceregexp>
+        -->
         <!-- 替换 BOServiceImpl 中的 BORepository 转到 PORepository -->
         <replaceregexp match="(\w+)BORepository" replace="\1PORepository" flags="gm">
             <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business" includes="**/*.java" />
         </replaceregexp>
-        <replaceregexp match="\.business.repository\.(\w+)BORepository"
+        <replaceregexp match="\.business\.repository\.(\w+)PORepository"
                        replace=".po.repository.\1PORepository"
+                       flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business" includes="**/*.java" />
+        </replaceregexp>
+        <replaceregexp match="\.business\.repository\."
+                       replace=".po.repository."
                        flags="gm">
             <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business" includes="**/*.java" />
         </replaceregexp>
         <!-- 将所有的 BOMapper 输出对象替换成 PO -->
         <replaceregexp match="(\w+)BO\b" replace="\1PO" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business/service/mapper"
-                     includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business">
+                <include name="**/*.java" />
+                <exclude name="domain/*BO.java" />
+            </fileset>
         </replaceregexp>
-        <replaceregexp match="\.business\.domain\.(\w+)BO" replace=".po.domain.\1PO" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business/service/mapper"
+        <replaceregexp match="\.business\.domain\.(\w+)PO" replace=".po.domain.\1PO" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business"
                      includes="**/*.java" />
         </replaceregexp>
         <!-- 将 BODTO 转到 BO -->
         <replaceregexp match="(\w+)BODTO\b" replace="\1BO" flags="gm">
             <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business" includes="**/*.java" />
         </replaceregexp>
-        <replaceregexp match="\.business\.service\.dto\.(\w+)BODTO" replace=".business.domain.\1BO" flags="gm">
+        <replaceregexp match="\.business\.service\.dto\.(\w+)BO" replace=".business.domain.\1BO" flags="gm">
             <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business/service"
                      includes="**/*.java" />
         </replaceregexp>
+        <replaceregexp match="\.business\.service\.dto\.UserDTO" replace=".view.service.dto.UserDTO" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business/service"
+                     includes="**/*.java" />
+        </replaceregexp>
+        <!-- 在mapper里投机取巧一下，将BO的import替换成PO -->
+        <replaceregexp match="\.business\.domain\.(\w+)BO" replace=".po.domain.\1PO" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business/service/mapper"
+                     includes="**/*.java" />
+        </replaceregexp>
+        <!-- 修改 aspect 里的参数饮用 -->
+        <replaceregexp match=".business.repository." replace=".po.repository" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/aop"
+                     includes="**/*.java" />
+        </replaceregexp>
+        <replaceregexp match=".business.web." replace=".view.web." flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/aop"
+                     includes="**/*.java" />
+        </replaceregexp>
+   
+        
     </target>
 
     <target name="gen.merge.po" if="${is_po}">
         <echo message="合并 PO 层文件" />
         <copy todir="${source_merge_dir}" verbose="true" >
             <fileset dir="${output_dir}/po/src">
-                <include name="main/java/${project_package_dir}/po/repository/*PORepository.java" />
+                <include name="main/java/${project_package_dir}/po/repository/*.java" />
+                <include name="main/java/${project_package_dir}/po/domain/*.java" />
+            </fileset>
+        </copy>
+        <copy todir="${source_merge_dir}/main/java/${project_package_dir}" verbose="true" >
+            <fileset dir="${output_dir}/po/src/main/java/${project_package_dir}/po">
+                <include name="config/CacheConfiguration.java" />
             </fileset>
         </copy>
     </target>
 
     <!-- 修复 PO 内部的链接关系，确保没有编译错误 -->
     <target name="gen.fix.po" if="${is_po}">
-    </target>
-
-
-
-    <target name="gen.merge1">
-        <echo message="========= 替换源文件开始 ======== " />
-        <echo message="引入文件" />
-        <copy todir="${project_path}/target/tmp/src/main/webapp" verbose="true">
-            <fileset dir="${view-project}/src/main/webapp" />
-        </copy>
-        <copy todir="${project_path}/target/tmp/src/main/java/com/apusic/aip/web/rest" verbose="true" >
-            <fileset dir="${view-project}/src/main/java/com/apusic/aip/web/rest" />
-        </copy>
-        <copy todir="${project_path}/target/tmp/src/main/java/com/apusic/aip/domain"
-              overwrite="true"
-              verbose="true"
-              force="true"
-              preservelastmodified="true">
-            <fileset dir="${bo-project}/src/main/java/com/apusic/aip/domain" />
-            <fileset dir="${po-project}/src/main/java/com/apusic/aip/domain" />
-        </copy>
-        <copy todir="${project_path}/target/tmp/src/main/java/com/apusic/aip/repository"
-              overwrite="true"
-              verbose="true"
-              force="true"
-              preservelastmodified="true">
-            <fileset dir="${po-project}/src/main/java/com/apusic/aip/repository" />
-        </copy>
-        <copy todir="${project_path}/target/tmp/src/main/java/com/apusic/aip"
-              overwrite="true"
-              verbose="true"
-              force="true"
-              preservelastmodified="true">
-            <fileset dir="${view-project}/src/main/java/com/apusic/aip/">
-                <include name="service/*" />
-                <include name="service/dto/" />
-                <include name="service/impl/" />
-                <include name="service/mapper/" />
-            </fileset>
-            <fileset dir="${bo-project}/src/main/java/com/apusic/aip/">
-                <include name="service/*" />
-                <include name="service/impl/" />
-                <include name="service/mapper/" />
-            </fileset>
-        </copy>
-        <copy todir="${project_path}/target/tmp/src/main/resources/config">
-            <fileset dir="${po-project}/src/main/resources/config" />
-        </copy>
-        <echo message="引入文件结束" />
-        <echo message="备份文件开始" />
-        <copy todir="${project_path}/target/view-translate-bak/webapp" overwrite="true">
-            <fileset dir="${project_path}/target/tmp/src/main/webapp" />
-        </copy>
-        <copy todir="${project_path}/target/view-translate-bak/rest" overwrite="true">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/web/rest" />
-        </copy>
-        <copy todir="${project_path}/target/view-translate-bak/domain" overwrite="true">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/domain" />
-        </copy>
-        <copy todir="${project_path}/target/view-translate-bak/repository" overwrite="true">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/repository" />
-        </copy>
-        <copy todir="${project_path}/target/view-translate-bak/service" overwrite="true">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service" />
-        </copy>
-        <echo message="备份文件结束" />
-        <!-- VO Service层转换 -->
-        <!-- *VORepository -> *BOService -->
-        <replaceregexp match="(\w*)VORepository" replace="\1BOService" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*VOServiceImpl.java" />
-        </replaceregexp>
-        <!-- *VO -> *BO -->
-        <replaceregexp match="(\w+)VO(.?\s|\))" replace="\1BO\2" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*VOServiceImpl.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*VOMapper.java" />
-        </replaceregexp>
-        <!-- *VO(S)TO -> *BO(S)TO -->
-        <replaceregexp match="(\w+)VO(S?TO)" replace="\1BO\2" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*VOServiceImpl.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*VOMapper.java" />
-        </replaceregexp>
-        <!-- *VO(S)( -> *BO(S)( -->
-        <replaceregexp match="(\w+)VO(S?\()" replace="\1BO\2" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*VOServiceImpl.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*VOMapper.java" />
-        </replaceregexp>
-        <!-- *VO(S)) -> *BO(S)) -->
-        <replaceregexp match="(\w+)VO(S?\))" replace="\1BO\2" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*VOMapper.java" />
-        </replaceregexp>
-        <!-- public interface *Mapper -> public abstract class *Mapper -->
-        <replaceregexp match="interface" replace="abstract\sclass" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*VOMapper.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*BOMapper.java" />
-        </replaceregexp>
-        <!-- *Mapper -> public abstract *Mapper -->
-        <replaceregexp match="(^\s*)((\w+)(\W[^\>]*\>)?\s+(\w+)\()" replace="\1public\sabstract\s\2 " flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*VOMapper.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*BOMapper.java" />
-        </replaceregexp>
-        <!-- import *VORepository -> *BOService-->
-        <replaceregexp match="aip.repository" replace="aip.service" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*VOServiceImpl.java" />
-        </replaceregexp>
-        <!-- BO Service层转换 -->
-        <!-- *BORepository -> *PORepository -->
-        <replaceregexp match="(\w+)BORepository" replace="\1PORepository" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*BOServiceImpl.java" />
-        </replaceregexp>
-        <!-- *BO -> *PO -->
-        <replaceregexp match="(\w+)BO(.?\s|\))" replace="\1PO\2" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*BOServiceImpl.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*BOMapper.java" />
-        </replaceregexp>
-        <!-- import *DTO -> *BO-->
-        <replaceregexp match="service.dto" replace="domain" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*BOServiceImpl.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service" includes="*BOService.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*BOMapper.java" />
-        </replaceregexp>
-        <!-- *BODTO -> *BO -->
-        <replaceregexp match="(\w*)BODTO(.?\)?;?\s?)" replace="\1BO\2" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service" includes="*BOService.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*BOServiceImpl.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*BOMapper.java" />
-        </replaceregexp>
-        <!-- *BO(S)TO -> *PO(S)TO -->
-        <replaceregexp match="(\w+)BO(S?TO)" replace="\1PO\2" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*BOServiceImpl.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*BOMapper.java" />
-        </replaceregexp>
-        <!-- *BO(S)( -> *PO(S)( -->
-        <replaceregexp match="(\w+)BO(S?\()" replace="\1PO\2" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/impl"
-                     includes="*BOServiceImpl.java" />
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*BOMapper.java" />
-        </replaceregexp>
-        <!-- *BO(S)) -> *PO(S)) -->
-        <replaceregexp match="(\w+)BO(S?\))" replace="\1PO\2" flags="g">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service/mapper"
-                     includes="*BOMapper.java" />
-        </replaceregexp>
-        <echo message="将替换好的文件放入工程开始" />
-        <copy todir="src/main/webapp" overwrite="true">
-            <fileset dir="${project_path}/target/tmp/src/main/webapp" />
-        </copy>
-        <copy todir="src/main/java/com/apusic/aip/web/rest" overwrite="true">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/web/rest" />
-        </copy>
-        <copy todir="src/main/java/com/apusic/aip/domain" overwrite="true">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/domain" />
-        </copy>
-        <copy todir="src/main/java/com/apusic/aip/repository" overwrite="true">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/repository" />
-        </copy>
-        <copy todir="src/main/java/com/apusic/aip/service" overwrite="true">
-            <fileset dir="${project_path}/target/tmp/src/main/java/com/apusic/aip/service" />
-        </copy>
-        <copy todir="src/main/resources/config" overwrite="true" force="true">
-            <fileset dir="${project_path}/target/tmp/src/main/resources/config" />
-        </copy>
-        <echo message="将替换好的文件放入工程开始结束" />
+        
     </target>
 
     <!-- 修复文件内部的链接关系，完成 vo-bo-po 的关联，确保没有编译错误 -->
     <target name="gen.fix" depends="gen.fix.vo, gen.fix.bo, gen.fix.po">
+        <!-- 修复因为移动导致的package问题 -->
+        <replaceregexp match="${project_package}\.\w+\.aop\b" replace="${project_package}.aop" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+        </replaceregexp>
+        <replaceregexp match="${project_package}\.\w+\.config\b" replace="${project_package}.config" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+        </replaceregexp>
+        <replaceregexp match="${project_package}\.\w+\.util\b" replace="${project_package}.util" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+        </replaceregexp>
+        <!-- 修复 User， Authority 等几个预定义对象的饮用 -->
+        <replaceregexp match="${project_package}\.\w+\.(\w+)\.User(Repository)?\b" replace="${project_package}.po.\1.User\2" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+        </replaceregexp>
+        <replaceregexp match="${project_package}.\w+.domain.Authority" replace="${project_package}.po.domain.Authority" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+        </replaceregexp>
+        <replaceregexp match="${project_package}\.\w+\.(\w+)\.PersistentToken(Repository)?\b" replace="${project_package}.po.\1.PersistentToken\2" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+        </replaceregexp>
+        <replaceregexp match="${project_package}\.\w+\.security\." replace="${project_package}.security." flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+        </replaceregexp>
+        <replaceregexp match="${project_package}\.\w+\.domain\.PersistentAuditEvent" replace="${project_package}.po.domain.PersistentAuditEvent" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}" includes="**/*.java" />
+        </replaceregexp>
+        <!-- 处理 config Constants 的引用 -->
+        <replaceregexp match="${project_package}\.\w+\.config\." replace="${project_package}.config." flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/" includes="**/*.java" />
+        </replaceregexp>
     </target>
 
     <!-- 从文件内部提取自定义符号，提升数据转换的灵活性 -->

@@ -1,34 +1,43 @@
-/** 工程 */
-entity Project{
+/*
+使用 View 作为结尾的主要原因是 VO 结尾不好看，而且界面层会体现在用户处，语法美观需要考虑
+*/
+
+/** 工程
+gen-include:TaskView[]
+*/
+entity ProjectView{
+    /** gen-from:ContractBO.customerName */
+    customerName String required,
     projName String required,
     projDescription String,
     createDate LocalDate required,
 }
 
 /** 任务 */
-entity Task {
+entity TaskView {
     taskName String required,
     taskDescription String,
-//    employeeId String,
+    /** gen-field: MemberView.name[] */
+    employeelist String,
 }
 
 relationship OneToMany{
 /** 工程的任务 */
-    Project{task}
-    to 
+    ProjectView{task}
+    to
     /** 任务隶属工程 */
-    Task{project}
+    TaskView{project}
 }
 
-entity Member{
+entity MemberView{
 /** 成员名称 */
     name String required,
 }
 
 relationship ManyToMany{
-    Task{employee}
-    to 
-    Member{task}
+    TaskView{employee}
+    to
+    MemberView{task}
 }
 
 dto * with mapstruct

@@ -1,12 +1,25 @@
 /** 工程 */
-entity Project{
+entity ProjectBO{
     projName String required,
     projDescription String,
     createDate LocalDate required,
 }
 
+/** 合同 */
+entity ContractBO{
+    customerName String required,
+}
+
+relationship OneToOne{
+    /** 项目合同 */
+    ProjectBO{contract}
+    to
+    /** 关联项目 */
+    ContractBO{project}
+}
+
 /** 任务 */
-entity Task {
+entity TaskBO {
     taskName String required,
     taskDescription String,
 //    employeeId String,
@@ -14,21 +27,21 @@ entity Task {
 
 relationship OneToMany{
 /** 工程的任务 */
-    Project{task}
+    ProjectBO{task}
     to 
     /** 任务隶属工程 */
-    Task{project}
+    TaskBO{project}
 }
 
-entity Member{
+entity MemberBO{
 /** 成员名称 */
     name String required,
 }
 
 relationship ManyToMany{
-    Task{employee}
+    TaskBO{employee}
     to 
-    Member{task}
+    MemberBO{task}
 }
 
 dto * with mapstruct

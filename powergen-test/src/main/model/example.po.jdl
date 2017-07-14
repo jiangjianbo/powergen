@@ -1,12 +1,25 @@
 /** 工程 */
-entity Project{
+entity ProjectPO{
     projName String required,
     projDescription String,
     createDate LocalDate required,
 }
 
+/** 合同 */
+entity ContractPO{
+    customerName String required,
+}
+
+relationship OneToOne{
+    /** 项目合同 */
+    ProjectPO{contract}
+    to
+    /** 关联项目 */
+    ContractPO{project}
+}
+
 /** 任务 */
-entity Task {
+entity TaskPO {
     taskName String required,
     taskDescription String,
 //    employeeId String,
@@ -14,24 +27,24 @@ entity Task {
 
 relationship OneToMany{
 /** 工程的任务 */
-    Project{task}
+    ProjectPO{task}
     to 
     /** 任务隶属工程 */
-    Task{project}
+    TaskPO{project}
 }
 
-entity Member{
+entity MemberPO{
 /** 成员名称 */
     name String required,
 }
 
 relationship ManyToMany{
-    Task{employee}
+    TaskPO{employee}
     to 
-    Member{task}
+    MemberPO{task}
 }
 
-dto * with mapstruct
+// dto * with mapstruct
 
 paginate * with pager
 
