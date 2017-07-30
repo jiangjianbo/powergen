@@ -383,7 +383,7 @@
     </target>
 
     <!-- 所有 gen. 开头的都依赖于 target_layer 属性 -->
-    <target name="gen.layer" depends="gen.copy, gen.build, gen.merge, gen.fix">
+    <target name="gen.layer" depends="gen.copy, gen.build, gen.load_jdl, gen.merge, gen.process, gen.fix">
 
     </target>
 
@@ -391,12 +391,13 @@
         <!-- 复制当前工程的基本配置文件 -->
         <echo>coping yo-rc</echo>
         <copy file="${project_dir}/.yo-rc.json" todir="${output_dir}/${target_layer}" overwrite="true" />
-        <!-- 复制 jdl 文件，除了生成 base 结构 -->
         
+        <!-- 复制 jdl 文件，除了生成 base 结构 -->
         <echo>copy ${project_name}.${target_layer}.jdl </echo>
         <copy file="${model_dir}/${project_name}.${target_layer}.jdl"
               tofile="${output_dir}/${target_layer}/${project_name}.${target_layer}.jdl"
               overwrite="true" />
+  
         <!-- 让不同的层生成内容在不同的命名空间中 -->
         <propertycopy name="layer_ns" from="packagename.${target_layer}" />
         <replace file="${output_dir}/${target_layer}/.yo-rc.json"
@@ -421,6 +422,222 @@
         </if>
     </target>
 
+    <target name="gen.load_jdl" >
+        <!-- 分析jdl文件，提取处理时候需要的信息，包括 
+            jdl.content 存放jdl内容，以便后续处理
+            jdl.entity.list 存放逗号分隔的jdl中所有实体名称列表
+            jdl.entity.dash-list 存放中划线分隔的jdl中所有实体名称列表
+            jdl.entity.relation.json 存放基于json结构的实体和实体关系信息
+         -->
+        <loadfile property="jdl.content" srcfile="${output_dir}/${target_layer}/${project_name}.${target_layer}.jdl">
+        </loadfile>
+        <script language="javascript"><![CDATA[
+            function show(msg){
+                echo = project.createTask("echo");
+                echo.setMessage(msg);
+                echo.perform()
+            }
+            
+            function eachArr(arr, func){
+                if( arr != null && arr.length > 0 )
+                    for(var i = 0; i < arr.length; ++i)
+                        func(arr[i], i);
+            }
+            
+            function eachMatch(text, regex, func){
+                var result;
+                while ((result = regex.exec(text)) != null){
+                    func(result);
+                }
+            }
+            
+            function pushItemAsString(arr, item){
+                arr.push("\"");
+                arr.push(item);
+                arr.push("\"");
+            }
+            
+            jdlContent = project.getProperty("jdl.content");
+            // 查找提取所有的实体名称
+            var arr = [];
+            eachMatch(jdlContent, /entity\s+(\w+)\s*\{/g, function(result){ arr.push(result[1]); });
+
+            var list = arr.join(",");
+            
+            project.setProperty("jdl.entity.list", list);
+            project.setProperty("jdl.entity.dash-list", list.replace( /(.)?\s*([A-Z])/g, 
+                function($0, $1, $2){
+                    return ($1 == null? "" : ($1 == "," ? $1: $1 + "-")) + $2.toLowerCase(); 
+                })
+            );
+           
+            // 提取entity前面的注释，以及entity相关的所有关系
+            var c_comment = "\\/\\*(?:(?!\\*\\/).|[\\n\\r])*\\*\\/";
+            var line_comment = "^\\s*\\/\\/.*[\\r\\n]+";
+            var maybe_space = "[\\r\\n\\s]*";
+            var req_space = "[\\r\\n\\s]+";
+            
+            var entity_pattern = "((" + line_comment + ")|(" + c_comment + "))" + maybe_space + // $1 $2 $3
+                                 "entity" + req_space + "(\\w+)" + maybe_space + "\\{";   // $4 $5
+            entityMap = {};
+            eachMatch(jdlContent, new RegExp(entity_pattern, "gm"), 
+                function(result){
+                    // 将实体相关的注释信息放入 entity: [开头注释，[关系，方向, 目标实体, 注释], [], ...]
+                    entityMap[result[4]] = [ result[0] ];
+                    //show(result[4] + ":" + result[0] + "\r\n------");
+                }
+            );
+            
+            // 提取relationship中定义的所有关系内容
+            var relation_pattern = "((" + line_comment + ")|(" + c_comment + "))" + maybe_space + // $1 $2 $3
+                                "(\\w+)" + maybe_space + "(\\{.*\\})?" +  // $4 $5
+                                req_space + "to" + req_space + 
+                                "((" + line_comment + ")|(" + c_comment + "))" + maybe_space + // $6 $7 $8 
+                                "(\\w+)" + maybe_space + "(\\{.*\\})?" + // $9 $10 
+                                "[,\\r\\n\\s]+" + maybe_space;
+            var relationship_pattern = "relationship\\s+(\\w+)" + maybe_space + "\\{" + maybe_space + // $1
+                        "(" + relation_pattern + ")+" + maybe_space +
+                        "\\}";
+            
+            var regRelation = new RegExp(relation_pattern, "gm");
+            var arr_relationship = jdlContent.match(new RegExp(relationship_pattern, "gm"));
+            
+            eachArr(arr_relationship, function(rel_block){
+                var result = /relationship\s+(\w+)/.exec(rel_block);
+                var relationType = result[1];
+                
+                eachMatch(rel_block, regRelation, function(result){
+                    // 将实体相关的注释信息放入，双向放入。[关系，方向, 目标实体, 注释]
+                    entityMap[result[4]].push([relationType, "forward", result[9], result[1] ]);
+                    entityMap[result[9]].push([relationType, "backward", result[4], result[6] ]);
+            
+                    //show("---" + result + " ===" )
+                });
+            });
+            //show("entityMap ==>" + entityMap);
+            
+            // 将每个entity关联的信息里所有 pg- 开头的信息全部提取，存放到 json 中
+            // 存放格式是 entity : {pg-KEY: value, ...}
+            relationJson = [];
+            var matchKV = /^.*(pg\-[\w\d\-]+)\s*:\s*(.+)\s*$/gm
+            relationJson.push("{");
+            eachArr( arr, function(ent, arrIdx){
+                //show("ent : " + ent);
+                
+                if( arrIdx != 0 ) relationJson.push(",");
+                pushItemAsString(relationJson, ent);
+                relationJson.push(": {");
+            
+                eachArr(entityMap[ent], function(item, idx){
+                    //show(" item of ent: " + item );
+                    eachMatch( idx == 0? item: item[3], matchKV, function(result){
+                        pushItemAsString(relationJson, result[1]);
+                        relationJson.push(":");
+                        pushItemAsString(relationJson, result[2]);
+                        relationJson.push(",");
+                    });
+                });
+                relationJson.push("}");
+            });
+            relationJson.push("}");
+            
+            project.setProperty("jdl.entity.relation.json", relationJson.join(""));
+        ]]></script>        
+        <echo>
+            ${jdl.entity.list} 
+            ${jdl.entity.dash-list} 
+            ${jdl.entity.relation.json}
+        </echo>
+    </target>
+      
+    <target name="gen.process">
+        <echo>processing each entities!</echo>
+        <antcall target="eachEntity" inheritAll="true" >
+            <param name="callback-target" value="gen.process.${target_layer}" />
+        </antcall>
+    </target>
+
+    <!-- 参数： callback-target 回掉的函数名 -->
+    <target name="eachEntity" >
+        <!--
+        jdl.entity.list 存放逗号分隔的jdl中所有实体名称列表
+        jdl.entity.dash-list 存放中划线分隔的jdl中所有实体名称列表
+        jdl.entity.relation.json 存放基于json结构的实体和实体关系信息
+        -->
+        <for list="${jdl.entity.list}" param="ent">
+            <sequential>
+                <!-- 提取 json 中 entity 相关的参数，并把它设置成 property -->
+                <!-- 提取 dash-name -->
+                <script language="javascript"><![CDATA[
+                    project.setProperty("entity.dash-name", "@{ent}".replace( /(.)?\s*([A-Z])/g, 
+                        function($0, $1, $2){
+                            return ($1 == null? "" : ($1 == "," ? $1: $1 + "-")) + $2.toLowerCase(); 
+                        })
+                    );  
+                ]]></script>   
+                <!-- 调用回调函数 -->
+                <antcall target="eachEntity.each" inheritAll="true" >
+                    <param name="entity.name" value="@{ent}" />
+                    <propertyset negate="true" >
+                        <propertyref prefix="pg-"/>
+                    </propertyset>
+                </antcall>
+            </sequential>
+        </for>         
+    </target>
+    
+    <target name="eachEntity.each" >
+        
+        <!-- 提取 json 中 entity 相关的参数，并把它设置成 property -->
+        <!-- 提取 dash-name -->
+        <script language="javascript"><![CDATA[
+            eval("entityConfig = " + project.getProperty("jdl.entity.relation.json"));
+            
+            ent = project.getProperty("entity.name")
+            cfg = entityConfig[ent];
+            
+            for(var prop in cfg){
+                if( prop.substring(0,3) == "pg-" ){
+                    project.setProperty(prop, cfg[prop]);
+                }
+            }
+        ]]></script>   
+        <!-- 调用回调函数 -->
+        <antcall target="${callback-target}" inheritAll="true" >
+        </antcall>
+    
+    </target>
+    
+    <!--  
+    -->
+    <target name="gen.process.vo" if="${is_vo}">
+        <!-- 显示环境参数 -->
+        <echo>processing ${entity.name} / ${entity.dash-name} </echo>
+        <propertyselector property="pg.list"
+                                 delimiter=","
+                                 match="(pg\-.+)"
+                                 select="\1"
+                                 casesensitive="false" />
+        <if>
+            <isset property="pg.list" />
+            <then>
+                <for list="${pg.list}" param="prop">
+                    <sequential>
+                        <echo>@{prop} = ${@{prop}}</echo>
+                    </sequential>
+                </for>
+            </then>
+        </if>
+        <!-- 处理每一个 entity 相关的文件 -->
+    </target>
+        
+    <target name="gen.process.bo" if="${is_bo}">
+    </target>
+        
+    <target name="gen.process.po" if="${is_po}">
+    </target>
+        
+        
     <target name="gen.build" if="${can_gen}">
         <!-- 只有没设置 skip-build-XX 的时候才运行 -->
         <for list="${target_layer}" param="proj">
@@ -581,7 +798,7 @@
 
     <!-- 从生成代码中获取需要的部分，并交给 gen.fix 处理 -->
     <target name="gen.merge" depends="gen.merge.vo, gen.merge.bo, gen.merge.po">
-        <echo>merge target!</echo>
+        
     </target>
 
     <target name="gen.merge.vo" if="${is_vo}">
