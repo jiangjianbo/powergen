@@ -46,7 +46,7 @@
         </condition>
     </target>
 
-    <target name="setenv.detect.project">
+    <target name="setenv.detect.project" depends="show-help">
         <condition property="has-yo_rc">
             <available file="${basedir}/.yo-rc.json" />
         </condition>
@@ -76,6 +76,7 @@
         <echo message="model input dir   = ${model_dir}" />
         <echo message="output dir        = ${output_dir}" />
         <echo message="package dir       = ${project_package_dir}" />
+        <echo message="view layer name   = ${view-layer-name}" />
         <echo>---------</echo>
         <echo message="clean-gen-source  = ${clean-gen-source}" />
         <echo message="skip-build        = ${skip-build}" />
@@ -100,6 +101,8 @@
         <property environment="env" />
 
         <property name="clean-gen-source" value="false" />
+        <!-- 默认的 view 层的package名称，允许针对不同的设备定义名字 -->
+        <property name="view-layer-name" value="view" />
         
         <property name="skip-build" value="false" />
         <property name="skip-build-vo" value="false" />
@@ -166,6 +169,7 @@
     <target name="show-help">
         <echo message="============= HELP =================" />
         <echo message="命令行参数控制: " />
+        <echo message="-Dview-layer-name=view   指定vo层的package名称，默认是view" />
         <echo message="-Dskip-build=true     跳过 vo, bo, po 的构建" />
         <echo message="-Dskip-build-vo=true  跳过 vo 的构建" />
         <echo message="-Dskip-build-po=true  跳过 po 的构建" />
@@ -369,7 +373,7 @@
         <property name="bo_dir" value="${output_dir}/bo" />
         <property name="po_dir" value="${output_dir}/po" />
 
-        <property name="packagename.vo" value="view" />
+        <property name="packagename.vo" value="${view-layer-name}" />
         <property name="packagename.bo" value="business" />
         <property name="packagename.po" value="po" />
 
@@ -593,29 +597,29 @@
         <copy todir="${project_dir}" overwrite="false">
             <fileset dir="${output_dir}/${target_layer}">
                 <include name="**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/view/service/*.java" />
+                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/service/*.java" />
                 <exclude name="*.jdl" />
                 <exclude name="*.jh" />
                 <exclude name="pom.xml" />
                 <exclude name=".yo-rc.json" />
                 <exclude name="target/**/*.*" />
                 <exclude name="node_modules/**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/view/domain/**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/view/repository/**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/view/aop/**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/view/config/**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/view/util/**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/view/security/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/domain/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/repository/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/aop/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/config/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/util/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/security/**/*.*" />
             </fileset>
         </copy>
         <copy todir="${source_merge_dir}/main/java/${project_package_dir}/" verbose="true" >
-            <fileset dir="${output_dir}/${target_layer}/src/main/java/${project_package_dir}/view">
+            <fileset dir="${output_dir}/${target_layer}/src/main/java/${project_package_dir}/${view-layer-name}">
                 <include name="security/**/*.*" />
                 <!-- CacheConfiguration用 PO 的 -->
                 <exclude name="security/CacheConfiguration.java" />
             </fileset>
             <fileset dir="${output_dir}/${target_layer}/src/main/java/${project_package_dir}">
-                <include name="view/service/*ViewService.java" />
+                <include name="${view-layer-name}/service/*ViewService.java" />
             </fileset>
         </copy>
         
@@ -642,7 +646,7 @@
                     <fileset dir="${project_dir}" includes="pom.xml" />
                 </replaceregexp>  
                 <!-- 修改 groupId 和 artifactId -->
-                <replaceregexp match="${project_package}.view" replace="${project_package}" flags="gm">
+                <replaceregexp match="${project_package}.${view-layer-name}" replace="${project_package}" flags="gm">
                     <fileset dir="${project_dir}" includes="pom.xml" />
                 </replaceregexp>  
             </then>
@@ -650,30 +654,32 @@
         <echo message="删除不必要的 View 层文件" />
         <delete verbose="true" >
             <dirset dir="${source_merge_dir}">
-                <include name="main/java/${project_package_dir}/view/domain/**" />
-                <include name="main/java/${project_package_dir}/view/repository/**" />
-                <include name="main/java/${project_package_dir}/view/aop/**" />
-                <include name="main/java/${project_package_dir}/view/config/**" />
-                <include name="main/java/${project_package_dir}/view/util/**" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/domain/**" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/repository/**" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/aop/**" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/config/**" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/util/**" />
             </dirset>
             <fileset dir="${source_merge_dir}">
-                <include name="main/java/${project_package_dir}/view/domain/*.*" />
-                <include name="main/java/${project_package_dir}/view/repository/*.*" />
-                <include name="main/java/${project_package_dir}/view/aip/**/*.*" />
-                <include name="main/java/${project_package_dir}/view/config/**/*.*" />
-                <include name="main/java/${project_package_dir}/view/util/*.*" />
-                <include name="main/java/${project_package_dir}/view/service/UserService.java" />
-                <include name="main/java/${project_package_dir}/view/service/MailService.java" />
-                <include name="main/java/${project_package_dir}/view/service/AuditEventService.java" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/domain/*.*" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/repository/*.*" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/aip/**/*.*" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/config/**/*.*" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/util/*.*" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/service/UserService.java" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/service/MailService.java" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/service/AuditEventService.java" />
             </fileset>
         </delete>
         <!-- 将DTO改成 View对象 -->
         <move todir="${source_merge_dir}" verbose="true" >
             <fileset dir="${source_merge_dir}">
-                <include name="main/java/${project_package_dir}/view/service/dto/*ViewDTO.java" />
+                <include name="main/java/${project_package_dir}/${view-layer-name}/service/dto/*ViewDTO.java" />
             </fileset>
             <mapper type="glob" from="*ViewDTO.java" to="*View.java" />
         </move>
+        <!-- 依次复制各个实体对应的文件，并且解析jdl中的标注，将内容进行修复 -->
+        
     </target>
 
     <!-- 修复 VO 内部的链接关系，确保没有编译错误 
@@ -682,41 +688,288 @@
     <target name="gen.fix.vo" if="${is_vo}">
         <!-- 将所有的 View 替换成 Business,同时修改import *.view.domain.*View 转到 *.business.domain.*BO -->
         <replaceregexp match="(\w+)View\b" replace="\1BO" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}" includes="**/*.java" />
         </replaceregexp>
-        <replaceregexp match="\.view\.domain\.(\w+)BO" replace=".business.domain.\1BO" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+        <replaceregexp match="\.${view-layer-name}\.domain\.(\w+)BO" replace=".business.domain.\1BO" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}" includes="**/*.java" />
         </replaceregexp>
-        <replaceregexp match="\.view\.domain\." replace=".business.domain." flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+        <replaceregexp match="\.${view-layer-name}\.domain\." replace=".business.domain." flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}" includes="**/*.java" />
         </replaceregexp>
-        <replaceregexp match="\.view\.security\b" replace=".security" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+        <replaceregexp match="\.${view-layer-name}\.security\b" replace=".security" flags="gm">
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}" includes="**/*.java" />
             <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/security" includes="**/*.java" />
         </replaceregexp>
         <!-- 将 ViewDTO 转到 View -->
         <replaceregexp match="(\w+)ViewDTO\b" replace="\1View" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}" includes="**/*.java" />
         </replaceregexp>
         <!-- 替换 ViewServiceImpl 中的 ViewRepository 转到 BusinessService -->
         <replaceregexp match="(\w+)ViewRepository" replace="\1BOService" flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}" includes="**/*.java" />
         </replaceregexp>
-        <replaceregexp match="\.view\.repository\.(\w+)BOService"
+        <replaceregexp match="\.${view-layer-name}\.repository\.(\w+)BOService"
                        replace=".business.service.\1BOService"
                        flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}" includes="**/*.java" />
         </replaceregexp>
         <replaceregexp match="\.\w+\.service\.((MailService)|(UserService)|(AuditEventService))\b"
                        replace=".business.service.\1"
                        flags="g">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view" includes="**/*.java" />
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}" includes="**/*.java" />
         </replaceregexp>
-        <!--  -->
-        <!--  -->
+        <!-- 提取所有app/entities/* 中的 html 片段，形成 directive，以便重用 -->
+        <for param="file">
+            <path>
+                <fileset dir="${source_merge_dir}/main/webapp/app/entities/" includes="**/*.html" />
+            </path>
+            <sequential>
+                <antcall target="gen.fix.vo.gen-directive" >
+                    <param name="filepath" value="@{file}" />
+                </antcall>
+                <!--  -->
+                <!--  -->
+            </sequential>
+        </for>        
         <!--  -->
     </target>
+    
+    <!-- 直接调用处理文件，提取文件中的内容生成新的directive。参数是 filepath -->
+    <target name="gen.fix.vo.gen-directive" >
+        <!-- 获取文件名的后缀，以便判断处理 -->
+        <pathconvert property="stdfile" targetos="unix">
+            <path location="${filepath}" />
+        </pathconvert>
+        <propertyregex property="file.path0" input="${stdfile}" regexp="([\w\d\-\./:]+)/([\w\-\.]+)/\2([\-\w]+)\.html" select="\1/\2" casesensitive="false" override="true" />
+        <propertyregex property="file.dirname" input="${stdfile}" regexp="([\w\d\-\./:]+)/([\w\-\.]+)/\2([\-\w]+)\.html" select="\2" casesensitive="false" override="true" />
+        <propertyregex property="file.postfix" input="${stdfile}" regexp="([\w\d\-\./:]+)/([\w\-\.]+)/\2([\-\w]+)\.html" select="\3" casesensitive="false" override="true" />
+        <script language="javascript"><![CDATA[
+            dirname = project.getProperty("file.dirname");
+            arr = dirname.split("-");
+            for(var i = 1; i < arr.length; i++)
+                arr[i] = arr[i].charAt(0).toUpperCase() + arr[i].substring(1);
+            project.setProperty("file.varname", arr.join(""));
+        ]]></script>
+        <echo level="debug" >
+            filepath = ${filepath}
+            stdfile = ${stdfile}
+            path part = ${file.path0}
+            dirname = ${file.dirname}
+            postfix = ${file.postfix}
+            varname = ${file.varname}
+        </echo>
+        <!-- 获取之后，file.postfix可能取值为 s，-dialog，-detail， -delete-dialog，开始提取文件内容，修改之后保存到新文件中 -->
+        <loadfile property="file.content" srcfile="${stdfile}" />
+        <switch value="${file.postfix}">
+            <case value="s">
+                <!-- 带编辑的表格 -->
+                <antcall target="gen.fix.vo.gen-list-edit-directive" >
+                </antcall>
+                <!-- 只可列举的，不带编辑的表格 -->
+                <antcall target="gen.fix.vo.gen-list-directive" >
+                </antcall>
+            </case>
+            <case value="-dialog">
+                <!--  -->
+                <antcall target="gen.fix.vo.gen-edit-directive" >
+                </antcall>
+            </case>
+            <case value="-detail">
+                <!--  -->
+                <antcall target="gen.fix.vo.gen-info-directive" >
+                </antcall>
+            </case>
+            <case value="-delete-dialog">
+                <!--  -->
+                <antcall target="gen.fix.vo.gen-delete-directive" >
+                </antcall>
+            </case>
+            <default>
+                <echo message="unknown file postfix value [${file.postfix}]" />
+            </default>
+        </switch>
+        <!-- 替换index.html里边的script部分 -->
+        <property name="index-js-scripts"><![CDATA[
+    <script src="app/entities/${file.dirname}/${file.dirname}-dialog.controller.js"></script>
+    <script src="app/entities/${file.dirname}/${file.dirname}-detail.controller.js"></script>
+    <script src="app/entities/${file.dirname}/${file.dirname}-delete-dialog.controller.js"></script>
+    <script src="app/entities/${file.dirname}/${file.dirname}-edit.controller.js"></script>
+    <script src="app/entities/${file.dirname}/${file.dirname}-info.controller.js"></script>
+    <script src="app/entities/${file.dirname}/${file.dirname}-list.controller.js"></script>
+    <script src="app/entities/${file.dirname}/${file.dirname}-list-edit.controller.js"></script>
+    <script src="app/entities/${file.dirname}/${file.dirname}.state.js"></script>
+    <script src="app/entities/${file.dirname}/${file.dirname}.service.js"></script>
+    <script src="app/entities/${file.dirname}/${file.dirname}.controller.js"></script>        
+]]></property>
+        <propertyregex property="file.dirname.regex" override="true" global="true"
+            input="${file.dirname}" regexp="([\.\-\&gt;\&lt;])" replace="\\$1" 
+        />
+        <property name="index-js-regex0"><![CDATA[<script\s+src="app/entities/${file.dirname.regex}[\s[^\s]]+${file.dirname.regex}/${file.dirname.regex}\.controller\.js">\s*</script>]]></property>
+        <propertyregex property="index-js-regex" override="true" global="true"
+            input="${index-js-regex0}" regexp="([\&gt;\&lt;])" replace="\\$1" 
+        />
+        
+        <replaceregexp match="[\r\n\s]*${index-js-regex}[\r\n\s]*" replace="${index-js-scripts}" flags="gm">
+            <fileset dir="${source_merge_dir}/main/webapp" includes="index.html" />
+        </replaceregexp>
+    </target>
+    
+    <target name="gen.fix.vo.gen-list-edit-directive" >
+        <propertyregex property="file.new-content" override="true" input="${file.content}" casesensitive="false" global="true"
+                       regexp="\&lt;div\&gt;[\r\n\s]+\&lt;h2\s+data\-translate=[\s[^\s]]+(\&lt;div\s+class=&quot;table\-responsive\s*&quot;[\s[^\s]]+)\&lt;div\s+class=&quot;text\-center\s*&quot;\&gt;[\s\r\n]+\&lt;jhi\-item\-count"
+                       select="\1" />
+        <echo level="debug">list file content=[${file.new-content}]</echo>
+        <!-- 生成新文件 -->
+        <echo file="${file.path0}/${file.dirname}-list-edit.html">${file.new-content}</echo>
+        <echo file="${file.path0}/${file.dirname}-list-edit.controller.js"><![CDATA[
+(function() {
+    'use strict';
 
+    var ${file.varname}ListEdit = {
+        bindings: {
+            ${file.varname}s: '='
+        },
+        controller: ${file.varname}ListEditController,
+
+        templateUrl: 'app/entities/${file.dirname}/${file.dirname}-list-edit.html'
+    };
+
+    angular
+        .module('${project_name}App')
+        .component('${file.varname}ListEdit', ${file.varname}ListEdit);
+
+    ${file.varname}ListEditController.$inject = ['$scope'];
+
+    function ${file.varname}ListEditController($scope) {
+        var vm = this;
+        vm.vm = {
+            ${file.varname}s: this.${file.varname}s
+        };
+    }
+})();            
+
+        ]]></echo>
+    </target>
+
+    <target name="gen.fix.vo.gen-list-directive" >
+        <propertyregex property="file.new-content-0" override="true" input="${file.content}" casesensitive="false" global="true"
+                       regexp="\&lt;div\&gt;[\r\n\s]+\&lt;h2\s+data\-translate=[\s[^\s]]+(\&lt;div\s+class=&quot;table\-responsive\s*&quot;[\s[^\s]]+)\&lt;div\s+class=&quot;text\-center\s*&quot;\&gt;[\s\r\n]+\&lt;jhi\-item\-count"
+                       select="\1" />
+        <propertyregex property="file.new-content" override="true" input="${file.new-content-0}" casesensitive="false" global="true"
+                       regexp="([\s[^\s]]+)\&lt;td class=&quot;text-right&quot;\&gt;[\s\r\n]+\&lt;div class=&quot;btn-group flex-btn-group-container&quot;\&gt;[\s[^\s]]+\&lt;/button\&gt;[\s\r\n]+\&lt;/div\&gt;[\s\r\n]+\&lt;/td\&gt;[\s\r\n]+(\&lt;/tr\&gt;[\s[^\s]]+)"
+                       select="\1\2" />
+        <echo level="debug">list file info=[${file.new-content}]</echo>
+        <!-- 生成新文件 -->
+        <echo file="${file.path0}/${file.dirname}-list.html">${file.new-content}</echo>
+        <echo file="${file.path0}/${file.dirname}-list.controller.js"><![CDATA[
+(function() {
+    'use strict';
+
+    var ${file.varname}List = {
+        bindings: {
+            ${file.varname}s: '='
+        },
+        controller: ${file.varname}ListController,
+
+        templateUrl: 'app/entities/${file.dirname}/${file.dirname}-list.html'
+    };
+
+    angular
+        .module('${project_name}App')
+        .component('${file.varname}List', ${file.varname}List);
+
+    ${file.varname}ListController.$inject = ['$scope'];
+
+    function ${file.varname}ListController($scope) {
+        var vm = this;
+        vm.vm = {
+            ${file.varname}s: this.${file.varname}s
+        };
+    }
+})();            
+
+        ]]></echo>
+    </target>
+
+    <target name="gen.fix.vo.gen-edit-directive" >
+        <propertyregex property="file.new-content" override="true" input="${file.content}" casesensitive="false" global="true"
+            regexp="[\s[^\s]]+jhi\-alert\-error\&gt;[\s[^\s]]+\&lt;input\s+type=&quot;text&quot;\s+class=&quot;form-control&quot;(.+[\s\r\n]+.+ng\-model=.+)\s+readonly\s+/\&gt;[\r\n\s]+\&lt;/div\&gt;([\s[^\s]]+)\&lt;/div\&gt;[\r\n\s]+\&lt;div\s+class=&quot;modal\-footer[\s[^\s]]+\&lt;/button\&gt;[\r\n\s]+\&lt;/div\&gt;[\r\n\s]+\&lt;/form\&gt;"
+            select="&lt;input type=&quot;hidden&quot; \1 /&gt;\2" />
+        <echo level="debug">edit dialog=[${file.new-content}]</echo>
+        <!-- 生成新文件 -->
+        <echo file="${file.path0}/${file.dirname}-edit.html">${file.new-content}</echo>
+        <echo file="${file.path0}/${file.dirname}-edit.controller.js"><![CDATA[
+(function() {
+    'use strict';
+
+    var ${file.varname}Edit = {
+        bindings: {
+            ${file.varname}: '='
+        },
+        controller: ${file.varname}EditController,
+
+        templateUrl: 'app/entities/${file.dirname}/${file.dirname}-edit.html'
+    };
+
+    angular
+        .module('${project_name}App')
+        .component('${file.varname}Edit', ${file.varname}Edit);
+
+    ${file.varname}EditController.$inject = ['$scope'];
+
+    function ${file.varname}EditController($scope) {
+        var vm = this;
+        vm.vm = {
+            ${file.varname}: this.${file.varname}
+        };
+    }
+})();            
+
+        ]]></echo>
+    </target>
+    
+    <target name="gen.fix.vo.gen-info-directive" >
+        <propertyregex property="file.new-content" override="true" input="${file.content}" casesensitive="false" global="true"
+            regexp="\&lt;/jhi-alert-error\&gt;[\r\n\s]+(\&lt;dl class=[\s[^\s]]+\&lt;/dl\&gt;)[\r\n\s]+\&lt;button type=&quot;submit&quot;"
+            select="\1" />
+        <echo level="debug">detail file content=[${file.new-content}]</echo>
+        <!-- 生成新文件 -->
+        <echo file="${file.path0}/${file.dirname}-info.html">${file.new-content}</echo>
+        <echo file="${file.path0}/${file.dirname}-info.controller.js"><![CDATA[
+(function() {
+    'use strict';
+
+    var ${file.varname}Info = {
+        bindings: {
+            ${file.varname}: '='
+        },
+        controller: ${file.varname}InfoController,
+
+        templateUrl: 'app/entities/${file.dirname}/${file.dirname}-info.html'
+    };
+
+    angular
+        .module('${project_name}App')
+        .component('${file.varname}Info', ${file.varname}Info);
+
+    ${file.varname}InfoController.$inject = ['$scope'];
+
+    function ${file.varname}InfoController($scope) {
+        var vm = this;
+        vm.vm = {
+            ${file.varname}: this.${file.varname}
+        };
+    }
+})();            
+
+        ]]></echo>
+    </target>
+    
+    <target name="gen.fix.vo.gen-delete-directive" >  
+        <echo>delete dialog file content=[${file.content}]</echo>
+        <!-- delete 不要做任何事情 -->
+    </target>
+    
     <target name="gen.merge.bo" if="${is_bo}">
         <echo message="合并 BO 层文件" />
         <copy todir="${source_merge_dir}" verbose="true" >
@@ -754,7 +1007,7 @@
         <replaceregexp match="(^\s+// jhipster-needle\-ehcache\-add\-entry\s*$)"
                        replace="${bo_config_code}\1"
                        flags="gm">
-            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/view/config"
+            <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}/config"
                      includes="CacheConfiguration.java" />
         </replaceregexp>
         -->
@@ -791,7 +1044,7 @@
             <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business/service"
                      includes="**/*.java" />
         </replaceregexp>
-        <replaceregexp match="\.business\.service\.dto\.UserDTO" replace=".view.service.dto.UserDTO" flags="gm">
+        <replaceregexp match="\.business\.service\.dto\.UserDTO" replace=".${view-layer-name}.service.dto.UserDTO" flags="gm">
             <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/business/service"
                      includes="**/*.java" />
         </replaceregexp>
@@ -805,7 +1058,7 @@
             <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/aop"
                      includes="**/*.java" />
         </replaceregexp>
-        <replaceregexp match=".business.web." replace=".view.web." flags="gm">
+        <replaceregexp match=".business.web." replace=".${view-layer-name}.web." flags="gm">
             <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/aop"
                      includes="**/*.java" />
         </replaceregexp>
