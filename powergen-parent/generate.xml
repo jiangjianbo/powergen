@@ -355,7 +355,7 @@
     </target>
 
     <target name="gen.yo_rc" unless="has-yo_rc">
-        <echo file="${project_dir}/.yo-rc.json" append="false">{
+        <echo file="${project_dir}/.yo-rc.json" append="false" encoding="utf-8" >{
   "generator-jhipster": {
     "promptValues": {
       "packageName": "${project_package}",
@@ -368,12 +368,12 @@
     "serverPort": "8080",
     "authenticationType": "session",
     "hibernateCache": "ehcache",
-    "clusteredHttpSession": false,
-    "websocket": false,
+    "clusteredHttpSession": "no",
+    "websocket": "no",
     "databaseType": "sql",
     "devDatabaseType": "h2Disk",
     "prodDatabaseType": "mysql",
-    "searchEngine": false,
+    "searchEngine": "elasticsearch",
     "messageBroker": false,
     "serviceDiscoveryType": false,
     "buildTool": "maven",
@@ -390,7 +390,8 @@
     "languages": [
       "en",
       "zh-cn"
-    ]
+    ],
+    "frontendBuilder": "grunt"
   }
 }
 		</echo>
@@ -779,6 +780,13 @@
 						</shellscript>
                     </else>
                 </if>
+                <if>
+                    <not><available file="${output_dir}/${target_layer}/src/main/webapp/app/entities" type="dir" /></not>
+                    <then>
+                        <delete file="${output_dir}/${target_layer}/${project_name}.${target_layer}.jdl" />
+                        <fail message="generate fail: webapp/app/entities not generated!" />
+                    </then>
+                </if>
                 <echo>building filished!</echo>
             </sequential>
         </for>
@@ -806,10 +814,22 @@
                 <move todir="${project_dir}/node_modules" >
                     <dirset dir="${output_dir}/${target_layer}/node_modules" />
                 </move>
+                <if>
+                    <available file="${output_dir}/${target_layer}/node_modules" type="dir" />
+                    <then>
+                        <fail message="move node_modules to parent failure!" />
+                    </then>
+                </if>
                 <antcall target="tool.link">
                     <param name="from.dir" value="${project_dir}/node_modules" />
                     <param name="to.link" value="${output_dir}/${target_layer}/node_modules" />
                 </antcall>
+                <if>
+                    <not><available file="${output_dir}/${target_layer}/node_modules" type="dir" /></not>
+                    <then>
+                        <fail message="link node_modules from parent failure!" />
+                    </then>
+                </if>
             </then>
         </if>
     </target>
