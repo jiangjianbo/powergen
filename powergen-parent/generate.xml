@@ -22,7 +22,29 @@
 -->
 <project name="powergen">
 
+    <scriptdef name="dash-name" language="javascript">
+        <attribute name="property"/>
+        <attribute name="value"/>
+        <![CDATA[
+        value = attributes.get("value");
+        arr = value.split("-");
+        for(var i = 1; i < arr.length; i++)
+            arr[i] = arr[i].charAt(0).toUpperCase() + arr[i].substring(1);
+        
+        project.setProperty(attributes.get("property"), arr.join(""));
+    ]]></scriptdef> 
+    
     <target name="setenv.taskdef" depends="setenv.detect.sys, setenv.taskdef.maven, setenv.taskdef.ant">
+    </target>
+
+    <target name="setenv.detect.sys">
+        <condition property="is-in-maven">
+            <isset property="maven.project.artifactId" />
+        </condition>
+
+        <condition property="is-windows-os">
+            <os family="windows" />
+        </condition>
     </target>
 
     <target name="setenv.taskdef.maven" if="${is-in-maven}">
@@ -36,16 +58,6 @@
         <taskdef resource="net/sf/antcontrib/antlib.xml" />
     </target>
 
-    <target name="setenv.detect.sys">
-        <condition property="is-in-maven">
-            <isset property="maven.project.artifactId" />
-        </condition>
-
-        <condition property="is-windows-os">
-            <os family="windows" />
-        </condition>
-    </target>
-
     <target name="setenv.detect.project" depends="show-help">
         <condition property="has-yo_rc">
             <available file="${basedir}/.yo-rc.json" />
@@ -56,6 +68,27 @@
         <condition property="has-modules">
             <available file="${basedir}/node_modules" type="dir" />
         </condition>
+    </target>
+    
+    <target name="setenv.vars.maven" if="${is-in-maven}" depends="setenv.detect.sys, setenv.taskdef">
+        <property name="project_name" value="${maven.project.artifactId}" />
+
+        <propertyregex property="project_package"
+                       input="${maven.project.groupId}"
+                       regexp="\-"
+                       replace="_"
+                       global="true"
+                       defaultValue="${maven.project.groupId}" />
+
+        <property name="project_dir" value="${basedir}" />
+        <property name="output_dir" value="${basedir}/target" />
+        <property name="source_merge_dir" value="${basedir}/src" />
+        <property name="model_dir" value="${basedir}/src/main/model" />
+
+    </target>
+
+    <target name="setenv.vars.ant" unless="is-in-maven" depends="setenv.detect.sys">
+        <property file="${basedir}/generate.properties" />
     </target>
 
     <!-- 设置系统变量的默认值 -->
@@ -125,26 +158,6 @@
         <record name="${basedir}/target/logs/generate.log" loglevel="${loglevel}" action="start" />
     </target>
 
-    <target name="setenv.vars.maven" if="${is-in-maven}" depends="setenv.detect.sys, setenv.taskdef">
-        <property name="project_name" value="${maven.project.artifactId}" />
-
-        <propertyregex property="project_package"
-                       input="${maven.project.groupId}"
-                       regexp="\-"
-                       replace="_"
-                       global="true"
-                       defaultValue="${maven.project.groupId}" />
-
-        <property name="project_dir" value="${basedir}" />
-        <property name="output_dir" value="${basedir}/target" />
-        <property name="source_merge_dir" value="${basedir}/src" />
-        <property name="model_dir" value="${basedir}/src/main/model" />
-
-    </target>
-
-    <target name="setenv.vars.ant" unless="is-in-maven" depends="setenv.detect.sys">
-        <property file="${basedir}/generate.properties" />
-    </target>
 
     <target name="setenv.vars.check">
         <mkdir dir="${output_dir}/logs" />
@@ -260,7 +273,28 @@
         </delete>
     </target>
     
-    <target name="generate" depends="setenv, gen.mkdir, gen.yo_rc, gen.init, gen.clean-gen">
+    <target name="generate" depends="setenv"  >
+        <script language="groovy">
+            ant = new AntBuilder()
+            
+            def nsMap = {vo: "${view-layer-name}", bo: "business", po: "po"}
+            
+            build(){
+                ["vo", "bo", "po"].each{layer ->
+                    if( force_build || "force_build_
+                    initDir()
+                    generateSource()
+                    copyBack()
+                    processSource()
+                }
+            }
+            fix()
+            
+        </script>
+    
+    </target>
+    
+    <target name="generate-1" depends="setenv, gen.mkdir, gen.yo_rc, gen.init, gen.clean-gen">
         <echo message="generate ..." />
 
         <for list="vo,bo,po" param="layer">
@@ -382,7 +416,9 @@
         <mkdir dir="${po_dir}" />
     </target>
 
-    <!-- 所有 gen. 开头的都依赖于 target_layer 属性 -->
+    <!-- 所有 gen. 开头的都依赖于 target_layer 属性。
+    处理步骤：1. copy基本模型， 2. build工程， 3.装入模型附加信息load_jdl， 4. merge公共内容， 5. process个体， 6. fix修复和链接
+    -->
     <target name="gen.layer" depends="gen.copy, gen.build, gen.load_jdl, gen.merge, gen.process, gen.fix">
 
     </target>
@@ -535,15 +571,30 @@
                         relationJson.push(":");
                         pushItemAsString(relationJson, result[2]);
                         relationJson.push(",");
+                        // 自动生成pg-relation-XXX的属性
+                        if( idx != 0 ) {
+                            relationlist.push(item[2]);
+            
+                            pushItemAsString(relationJson, "pg-relationship-" + item[2]);
+                            relationJson.push(":");
+                            pushItemAsString(relationJson, item[0]);
+                            relationJson.push(",");
+            
+                            pushItemAsString(relationJson, "pg-relation-dir-" + item[2]);
+                            relationJson.push(":");
+                            pushItemAsString(relationJson, item[1]);
+                            relationJson.push(",");
+                        }
                     });
                 });
+            
                 relationJson.push("}");
             });
             relationJson.push("}");
-            
+                        
             project.setProperty("jdl.entity.relation.json", relationJson.join(""));
         ]]></script>        
-        <echo>
+        <echo level="debug">
             ${jdl.entity.list} 
             ${jdl.entity.dash-list} 
             ${jdl.entity.relation.json}
@@ -553,7 +604,7 @@
     <target name="gen.process">
         <echo>processing each entities!</echo>
         <antcall target="eachEntity" inheritAll="true" >
-            <param name="callback-target" value="gen.process.${target_layer}" />
+            <param name="callback-target" value="gen.process.${target_layer}-entity" />
         </antcall>
     </target>
 
@@ -575,7 +626,7 @@
                         })
                     );  
                 ]]></script>   
-                <!-- 调用回调函数 -->
+                <!-- 调用回调函数，利用antcall产生的作用域切换，隔离每次循环的创建的property，避免相互影响 -->
                 <antcall target="eachEntity.each" inheritAll="true" >
                     <param name="entity.name" value="@{ent}" />
                     <propertyset negate="true" >
@@ -587,7 +638,6 @@
     </target>
     
     <target name="eachEntity.each" >
-        
         <!-- 提取 json 中 entity 相关的参数，并把它设置成 property -->
         <!-- 提取 dash-name -->
         <script language="javascript"><![CDATA[
@@ -605,12 +655,18 @@
         <!-- 调用回调函数 -->
         <antcall target="${callback-target}" inheritAll="true" >
         </antcall>
-    
     </target>
     
-    <!--  
+    <!--  目前 jdl 中每一个实体可以指定 
+    pg-state:delete,edit,brief-edit,brief,detail,list, list-edit，手工属性，默认全部都要
+    pg-brief-of: YYY 当前对象是 YYY 对象的简化， 手工属性。处理时会将当前对象复制到 YYY 的目录下并改名
+    pg-map-to: YYY   映射view对象到YYY对象的BO，手工属性
+    pg-view：XXX,YYY, ... 帮助在 app/views/下生成特定的视图，里边包含 directive 组合的页面，手工属性
+    pg-relationship-XXX: 当前对象和 XXX 实体的关联关系，自动生成属性
+    pg-relation-dir-XXX: 当前对象和 XXx 实体关系的关联方向，自动生成属性
+    可用变量： entity.name, entity.dash-name
     -->
-    <target name="gen.process.vo" if="${is_vo}">
+    <target name="gen.process.vo-entity" if="${is_vo}">
         <!-- 显示环境参数 -->
         <echo>processing ${entity.name} / ${entity.dash-name} </echo>
         <propertyselector property="pg.list"
@@ -621,6 +677,7 @@
         <if>
             <isset property="pg.list" />
             <then>
+                <echo>properties: </echo>
                 <for list="${pg.list}" param="prop">
                     <sequential>
                         <echo>@{prop} = ${@{prop}}</echo>
@@ -628,13 +685,51 @@
                 </for>
             </then>
         </if>
-        <!-- 处理每一个 entity 相关的文件 -->
+        <!-- 处理每一个 entity 相关的文件，逻辑如下：
+        1. 将 *ViewDTO 修改成 *View
+        2. 提取html的内容，生成相关的 directive
+        -->
+        <copy todir="${source_merge_dir}/main/webapp/" verbose="true" >
+            <fileset dir="${output_dir}/${target_layer}/src/main/webapp">
+                <include name="app/entities/${entity.dash-name}/${entity.dash-name}-delete-dialog*.*" />
+                <include name="app/entities/${entity.dash-name}/${entity.dash-name}-detail*.*" />
+                <include name="app/entities/${entity.dash-name}/${entity.dash-name}-dialog*.*" />
+                <include name="app/entities/${entity.dash-name}/${entity.dash-name}-edit*.*" />
+                <include name="app/entities/${entity.dash-name}/${entity.dash-name}-info*.*" />
+                <include name="app/entities/${entity.dash-name}/${entity.dash-name}-list-edit*.*" />
+                <include name="app/entities/${entity.dash-name}/${entity.dash-name}-list*.*" />
+                <include name="app/entities/${entity.dash-name}/${entity.dash-name}s.html" />
+                <include name="app/entities/${entity.dash-name}/${entity.dash-name}.*.js" />
+            </fileset>
+        </copy>
+        <copy todir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}" verbose="true" >
+            <fileset dir="${output_dir}/${target_layer}/src/main/java/${project_package_dir}/${view-layer-name}">
+                <include name="web/rest/${entity.name}Resource.java" />
+                <include name="service/${entity.name}Service.java" />
+                <include name="service/impl/${entity.name}ServiceImpl.java" />
+                <include name="service/mapper/${entity.name}Mapper.java" />
+                <include name="service/dto/${entity.name}.java" />
+            </fileset>
+        </copy>
+        <!-- 提取所有app/entities/* 中的 html 片段，形成 directive，以便重用 -->
+        <for param="file">
+            <path>
+                <fileset dir="${source_merge_dir}/main/webapp/app/entities/${entity.dash-name}" includes="*.html" />
+            </path>
+            <sequential>
+                <antcall target="gen.process.vo.gen-directive" >
+                    <param name="filepath" value="@{file}" />
+                </antcall>
+                <!--  -->
+                <!--  -->
+            </sequential>
+        </for>       
     </target>
         
-    <target name="gen.process.bo" if="${is_bo}">
+    <target name="gen.process.bo-entity" if="${is_bo}">
     </target>
         
-    <target name="gen.process.po" if="${is_po}">
+    <target name="gen.process.po-entity" if="${is_po}">
     </target>
         
         
@@ -811,32 +906,52 @@
         <fail message="assert is_vo=false" unless="is_vo" />
 
         <echo>copy project files for init</echo>
+        <!-- 需要原封不动复制的文件 -->
         <copy todir="${project_dir}" overwrite="false">
             <fileset dir="${output_dir}/${target_layer}">
-                <include name="**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/service/*.java" />
+                <include name="*.*" />
+                <include name="gulp/*.*" />
+                <include name="src/test/**/*.*" />
+                <include name="src/main/docker/**/*.*" />
+                <include name="src/main/resources/**/*.*" />
+                <include name="src/main/webapp/**/*.*" />
+                
+                <include name="src/main/webapp/entities/*.*" />
+                <exclude name="src/main/webapp/entities/**/*.*" />
+                
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/*.*" />
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/web/*.*" />
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/web/rest/AccountResource.java" />
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/web/rest/AuditResource.java" />
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/web/rest/LogsResource.java" />
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/web/rest/ProfileInfoResource.java" />
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/web/rest/UserResource.java" />
+                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/web/rest/*.*" />
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/web/rest/**/*.*" />
+                
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/service/dto/UserDTO.java" />
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/service/mapper/EntityMapper.java" />
+                <include name="src/main/java/${project_package_dir}/${view-layer-name}/service/mapper/UserMapper.java" />
+                
                 <exclude name="*.jdl" />
                 <exclude name="*.jh" />
                 <exclude name="pom.xml" />
                 <exclude name=".yo-rc.json" />
                 <exclude name="target/**/*.*" />
                 <exclude name="node_modules/**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/domain/**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/repository/**/*.*" />
                 <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/aop/**/*.*" />
                 <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/config/**/*.*" />
-                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/util/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/domain/**/*.*" />
+                <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/repository/**/*.*" />
                 <exclude name="src/main/java/${project_package_dir}/${view-layer-name}/security/**/*.*" />
             </fileset>
         </copy>
+        <!-- 需要移动package的文件 -->
         <copy todir="${source_merge_dir}/main/java/${project_package_dir}/" verbose="true" >
             <fileset dir="${output_dir}/${target_layer}/src/main/java/${project_package_dir}/${view-layer-name}">
                 <include name="security/**/*.*" />
                 <!-- CacheConfiguration用 PO 的 -->
                 <exclude name="security/CacheConfiguration.java" />
-            </fileset>
-            <fileset dir="${output_dir}/${target_layer}/src/main/java/${project_package_dir}">
-                <include name="${view-layer-name}/service/*ViewService.java" />
             </fileset>
         </copy>
         
@@ -867,36 +982,7 @@
                     <fileset dir="${project_dir}" includes="pom.xml" />
                 </replaceregexp>  
             </then>
-        </if>
-        <echo message="删除不必要的 View 层文件" />
-        <delete verbose="true" >
-            <dirset dir="${source_merge_dir}">
-                <include name="main/java/${project_package_dir}/${view-layer-name}/domain/**" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/repository/**" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/aop/**" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/config/**" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/util/**" />
-            </dirset>
-            <fileset dir="${source_merge_dir}">
-                <include name="main/java/${project_package_dir}/${view-layer-name}/domain/*.*" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/repository/*.*" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/aip/**/*.*" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/config/**/*.*" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/util/*.*" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/service/UserService.java" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/service/MailService.java" />
-                <include name="main/java/${project_package_dir}/${view-layer-name}/service/AuditEventService.java" />
-            </fileset>
-        </delete>
-        <!-- 将DTO改成 View对象 -->
-        <move todir="${source_merge_dir}" verbose="true" >
-            <fileset dir="${source_merge_dir}">
-                <include name="main/java/${project_package_dir}/${view-layer-name}/service/dto/*ViewDTO.java" />
-            </fileset>
-            <mapper type="glob" from="*ViewDTO.java" to="*View.java" />
-        </move>
-        <!-- 依次复制各个实体对应的文件，并且解析jdl中的标注，将内容进行修复 -->
-        
+        </if>        
     </target>
 
     <!-- 修复 VO 内部的链接关系，确保没有编译错误 
@@ -935,24 +1021,12 @@
                        flags="g">
             <fileset dir="${source_merge_dir}/main/java/${project_package_dir}/${view-layer-name}" includes="**/*.java" />
         </replaceregexp>
-        <!-- 提取所有app/entities/* 中的 html 片段，形成 directive，以便重用 -->
-        <for param="file">
-            <path>
-                <fileset dir="${source_merge_dir}/main/webapp/app/entities/" includes="**/*.html" />
-            </path>
-            <sequential>
-                <antcall target="gen.fix.vo.gen-directive" >
-                    <param name="filepath" value="@{file}" />
-                </antcall>
-                <!--  -->
-                <!--  -->
-            </sequential>
-        </for>        
+         
         <!--  -->
     </target>
     
     <!-- 直接调用处理文件，提取文件中的内容生成新的directive。参数是 filepath -->
-    <target name="gen.fix.vo.gen-directive" >
+    <target name="gen.process.vo.gen-directive" >
         <!-- 获取文件名的后缀，以便判断处理 -->
         <pathconvert property="stdfile" targetos="unix">
             <path location="${filepath}" />
@@ -960,13 +1034,7 @@
         <propertyregex property="file.path0" input="${stdfile}" regexp="([\w\d\-\./:]+)/([\w\-\.]+)/\2([\-\w]+)\.html" select="\1/\2" casesensitive="false" override="true" />
         <propertyregex property="file.dirname" input="${stdfile}" regexp="([\w\d\-\./:]+)/([\w\-\.]+)/\2([\-\w]+)\.html" select="\2" casesensitive="false" override="true" />
         <propertyregex property="file.postfix" input="${stdfile}" regexp="([\w\d\-\./:]+)/([\w\-\.]+)/\2([\-\w]+)\.html" select="\3" casesensitive="false" override="true" />
-        <script language="javascript"><![CDATA[
-            dirname = project.getProperty("file.dirname");
-            arr = dirname.split("-");
-            for(var i = 1; i < arr.length; i++)
-                arr[i] = arr[i].charAt(0).toUpperCase() + arr[i].substring(1);
-            project.setProperty("file.varname", arr.join(""));
-        ]]></script>
+        <dash-name property="file.varname" value="${file.dirname}" />
         <echo level="debug" >
             filepath = ${filepath}
             stdfile = ${stdfile}
@@ -980,25 +1048,25 @@
         <switch value="${file.postfix}">
             <case value="s">
                 <!-- 带编辑的表格 -->
-                <antcall target="gen.fix.vo.gen-list-edit-directive" >
+                <antcall target="gen.process.vo.gen-list-edit-directive" >
                 </antcall>
                 <!-- 只可列举的，不带编辑的表格 -->
-                <antcall target="gen.fix.vo.gen-list-directive" >
+                <antcall target="gen.process.vo.gen-list-directive" >
                 </antcall>
             </case>
             <case value="-dialog">
                 <!--  -->
-                <antcall target="gen.fix.vo.gen-edit-directive" >
+                <antcall target="gen.process.vo.gen-edit-directive" >
                 </antcall>
             </case>
             <case value="-detail">
                 <!--  -->
-                <antcall target="gen.fix.vo.gen-info-directive" >
+                <antcall target="gen.process.vo.gen-info-directive" >
                 </antcall>
             </case>
             <case value="-delete-dialog">
                 <!--  -->
-                <antcall target="gen.fix.vo.gen-delete-directive" >
+                <antcall target="gen.process.vo.gen-delete-directive" >
                 </antcall>
             </case>
             <default>
@@ -1031,7 +1099,7 @@
         </replaceregexp>
     </target>
     
-    <target name="gen.fix.vo.gen-list-edit-directive" >
+    <target name="gen.process.vo.gen-list-edit-directive" >
         <propertyregex property="file.new-content" override="true" input="${file.content}" casesensitive="false" global="true"
                        regexp="\&lt;div\&gt;[\r\n\s]+\&lt;h2\s+data\-translate=[\s[^\s]]+(\&lt;div\s+class=&quot;table\-responsive\s*&quot;[\s[^\s]]+)\&lt;div\s+class=&quot;text\-center\s*&quot;\&gt;[\s\r\n]+\&lt;jhi\-item\-count"
                        select="\1" />
@@ -1068,7 +1136,7 @@
         ]]></echo>
     </target>
 
-    <target name="gen.fix.vo.gen-list-directive" >
+    <target name="gen.process.vo.gen-list-directive" >
         <propertyregex property="file.new-content-0" override="true" input="${file.content}" casesensitive="false" global="true"
                        regexp="\&lt;div\&gt;[\r\n\s]+\&lt;h2\s+data\-translate=[\s[^\s]]+(\&lt;div\s+class=&quot;table\-responsive\s*&quot;[\s[^\s]]+)\&lt;div\s+class=&quot;text\-center\s*&quot;\&gt;[\s\r\n]+\&lt;jhi\-item\-count"
                        select="\1" />
@@ -1108,7 +1176,7 @@
         ]]></echo>
     </target>
 
-    <target name="gen.fix.vo.gen-edit-directive" >
+    <target name="gen.process.vo.gen-edit-directive" >
         <propertyregex property="file.new-content" override="true" input="${file.content}" casesensitive="false" global="true"
             regexp="[\s[^\s]]+jhi\-alert\-error\&gt;[\s[^\s]]+\&lt;input\s+type=&quot;text&quot;\s+class=&quot;form-control&quot;(.+[\s\r\n]+.+ng\-model=.+)\s+readonly\s+/\&gt;[\r\n\s]+\&lt;/div\&gt;([\s[^\s]]+)\&lt;/div\&gt;[\r\n\s]+\&lt;div\s+class=&quot;modal\-footer[\s[^\s]]+\&lt;/button\&gt;[\r\n\s]+\&lt;/div\&gt;[\r\n\s]+\&lt;/form\&gt;"
             select="&lt;input type=&quot;hidden&quot; \1 /&gt;\2" />
@@ -1145,7 +1213,7 @@
         ]]></echo>
     </target>
     
-    <target name="gen.fix.vo.gen-info-directive" >
+    <target name="gen.process.vo.gen-info-directive" >
         <propertyregex property="file.new-content" override="true" input="${file.content}" casesensitive="false" global="true"
             regexp="\&lt;/jhi-alert-error\&gt;[\r\n\s]+(\&lt;dl class=[\s[^\s]]+\&lt;/dl\&gt;)[\r\n\s]+\&lt;button type=&quot;submit&quot;"
             select="\1" />
@@ -1182,7 +1250,7 @@
         ]]></echo>
     </target>
     
-    <target name="gen.fix.vo.gen-delete-directive" >  
+    <target name="gen.process.vo.gen-delete-directive" >  
         <echo>delete dialog file content=[${file.content}]</echo>
         <!-- delete 不要做任何事情 -->
     </target>

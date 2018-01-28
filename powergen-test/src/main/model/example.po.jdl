@@ -1,13 +1,18 @@
-/** 工程 */
+/** 工程
+pg-entity: ProjectBO
+*/
 entity ProjectPO{
     projName String required,
     projDescription String,
     createDate LocalDate required,
 }
 
-/** 合同 */
+/** 合同
+pg-entity: ContractBO
+*/
 entity ContractPO{
     customerName String required,
+    amount Integer required,
 }
 
 relationship OneToOne{
@@ -18,30 +23,41 @@ relationship OneToOne{
     ContractPO{project}
 }
 
-/** 任务 */
+/** 任务
+pg-entity: TaskBO
+*/
 entity TaskPO {
     taskName String required,
     taskDescription String,
-//    employeeId String,
+    workload Integer,
 }
 
 relationship OneToMany{
 /** 工程的任务 */
     ProjectPO{task}
-    to 
+    to
     /** 任务隶属工程 */
     TaskPO{project}
 }
 
+/**
+pg-entity: MemberBO
+*/
 entity MemberPO{
 /** 成员名称 */
     name String required,
+    level Integer,
 }
 
 relationship ManyToMany{
     TaskPO{employee}
-    to 
+    to
     MemberPO{task}
+}
+
+entity SampleData{
+    dataName String,
+    description String
 }
 
 // dto * with mapstruct

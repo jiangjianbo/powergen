@@ -1,11 +1,12 @@
-/*
-使用 View 作为结尾的主要原因是 VO 结尾不好看，而且界面层会体现在用户处，语法美观需要考虑
-*/
+
 
 /** 工程
-gen-include:TaskView[]
+pg-entity: ProjectBO
+pg-state: list
+pg-detail-link: Project
+只要list部分，且 list item 跳转到 Project
 */
-entity ProjectView{
+entity ProjectList{
     /** gen-from:ContractBO.customerName */
     customerName String required,
     projName String required,
@@ -13,31 +14,152 @@ entity ProjectView{
     createDate LocalDate required,
 }
 
-/** 任务 */
-entity TaskView {
+/** 工程
+pg-state: detail, edit
+pg-entity: ProjectBO
+pg-include-list: ProjectTask, ProjectMember
+*/
+entity Project{
+    /** pg-map-to:ContractBO.customerName */
+    customerName String required,
+    projName String required,
+    projDescription String,
+    createDate LocalDate required,
+}
+
+/** 任务
+pg-entity: TaskBO
+pg-state: list
+pg-detail-link: Task
+*/
+entity ProjectTask {
     taskName String required,
     taskDescription String,
-    /** gen-field: MemberView.name[] */
-    employeelist String,
+    /** pg-collapse-field: ProjectTaskMember.name[] */
+    memberArray String,
 }
 
 relationship OneToMany{
 /** 工程的任务 */
-    ProjectView{task}
+    Project{task(taskName)}
     to
     /** 任务隶属工程 */
-    TaskView{project}
+    ProjectTask{project}
 }
 
-entity MemberView{
-/** 成员名称 */
+/**
+pg-entity: MemberBO
+pg-state: none
+pg-detail-link: Member
+*/
+entity ProjectTaskMember{
+/** 成员名称
+pg-map-to: memberName
+*/
     name String required,
 }
 
-relationship ManyToMany{
-    TaskView{employee}
+relationship OneToMany{
+    ProjectTask{taskMembers(name)}
     to
-    MemberView{task}
+    ProjectTaskMember{task}
+}
+
+/**
+pg-entity: MemberBO
+pg-state: list
+pg-detail-link: Member
+*/
+entity ProjectMember{
+/** 成员名称
+pg-map-to: memberName
+*/
+    name String required,
+    level Integer,
+}
+
+relationship OneToMany{
+    Project{member(name)}
+    to
+    ProjectMember{task}
+}
+
+/** 任务
+pg-entity: TaskBO
+pg-state: list, detail, edit
+pg-include-list: TaskMember
+*/
+entity Task {
+    taskName String required,
+    taskDescription String,
+    /** pg-collapse-field: TaskMember.name[] */
+    memberArray String,
+}
+
+/**
+pg-entity: MemberBO
+pg-state: list
+pg-detail-link: Member
+*/
+entity TaskMember{
+/** 成员名称
+pg-map-to: memberName
+*/
+    name String required,
+    level Integer,
+}
+
+relationship ManyToMany{
+    Task{member(name)}
+    to
+    TaskMember{task}
+}
+
+/**
+pg-entity: MemberBO
+pg-include-list: MemberTask, MemberProject
+*/
+entity Member{
+/** 成员名称
+pg-map-to: memberName
+*/
+    name String required,
+    level Integer,
+}
+
+/** 任务
+pg-entity: TaskBO
+pg-state: list
+pg-detail-link: Task
+*/
+entity MemberTask {
+    taskName String required,
+    taskDescription String,
+}
+
+relationship OneToMany{
+    Member{task(taskName)}
+    to
+    MemberTask
+}
+
+/** 工程
+pg-entity: ProjectBO
+pg-state: list
+pg-detail-link: Project
+只要list部分，且 list item 跳转到 Project
+*/
+entity MemberProject{
+    /** gen-from:ContractBO.customerName */
+    customerName String required,
+    projName String required,
+    createDate LocalDate required,
+}
+
+relationship OneToMany{
+    Member{task(taskName)}
+    to
+    MemberProject
 }
 
 dto * with mapstruct

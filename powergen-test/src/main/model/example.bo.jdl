@@ -1,4 +1,5 @@
-/** 工程 */
+/** 工程
+*/
 entity ProjectBO{
     projName String required,
     projDescription String,
@@ -8,6 +9,7 @@ entity ProjectBO{
 /** 合同 */
 entity ContractBO{
     customerName String required,
+    amount Integer required,
 }
 
 relationship OneToOne{
@@ -22,25 +24,26 @@ relationship OneToOne{
 entity TaskBO {
     taskName String required,
     taskDescription String,
-//    employeeId String,
+    workload Integer,
 }
 
 relationship OneToMany{
 /** 工程的任务 */
-    ProjectBO{task}
-    to 
+    ProjectBO{task(taskName)}
+    to
     /** 任务隶属工程 */
     TaskBO{project}
 }
 
 entity MemberBO{
 /** 成员名称 */
-    name String required,
+    memberName String required,
+    level Integer,
 }
 
 relationship ManyToMany{
-    TaskBO{employee}
-    to 
+    TaskBO{employee(name)}
+    to
     MemberBO{task}
 }
 
