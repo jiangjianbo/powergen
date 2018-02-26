@@ -1509,6 +1509,32 @@ service * with serviceImpl
                 ]
         )
 
+        // 修改 config/CacheConfiguration.java 中的注册内容
+
+        // 删除文件中的 temp-abc 相关的内容
+        ant.replaceregexp(match: /^\s*<script\s+src="app\/entities\/temp\-abc\/temp\-abc.+"\s*>\s*<\/script>\s*$/, replace: "", flags: "gm"){
+            fileset(file: "${subProjectDir}/framework/src/main/webapp/index.html")
+        }
+        ant.replaceregexp(match: /^\s*<include file="classpath:config\/liquibase\/changelog\/.+_added_entity_TempABC.xml" relativeToChangelogFile="false"\/>\s*$/, replace: "", flags: "gm"){
+            fileset(file: "${subProjectDir}/framework/src/main/resources/config/liquibase/master.xml")
+        }
+        ant.delete(){
+            fileset(file: "${subProjectDir}/framework/src/main/resources/config/liquibase/changelog/*_added_entity_TempABC.xml")
+            fileset(dir: "${subProjectDir}/framework/src/main/webapp/app/entities/temp-abc")
+            fileset(dir: "${subProjectDir}/framework/src/main/webapp/i18n"){
+                include(name: "**/*/tempABC.json")
+            }
+        }
+        ant.replaceregexp(match: /^\s*<a\s+ui\-sref="temp\-abc"[\s\S]+?data\-translate="global\.menu\.entities\.tempAbc">.+<\/span>[\s\S]+?<\/a>\s*$/,
+                replace: "", flags: "gm"){
+            fileset(file: "${subProjectDir}/framework/src/main/webapp/app/layouts/navbar/navbar.html")
+        }
+        ant.replaceregexp(match: /^\s*"tempAbc"\s*:\s*".*"\s*,\s*$/, replace: "", flags: "gm"){
+            fileset(dir: "${subProjectDir}/framework/src/main/webapp/i18n"){
+                include(name: "**/*/global.json")
+            }
+        }
+
         // 复制 bower_components
         copyAndReplaceFiles("${subProjectDir}/framework/src",
                 [
