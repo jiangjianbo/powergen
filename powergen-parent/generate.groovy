@@ -937,9 +937,9 @@ class AnalysisGenerator extends Generator{
 
         _load_jdl("$targetDir/$jdlName".toFile().text)
 
-        assert entityMap.size() > 0
-        assert relationMap.size() > 0
-        assert reverseRelationMap.size() > 0
+        //assert entityMap.size() > 0
+        //assert relationMap.size() > 0
+        //assert reverseRelationMap.size() > 0
     }
 
     public void _load_jdl(String jdl){
