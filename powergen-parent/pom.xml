@@ -13,7 +13,7 @@
 	<groupId>com.github.powergen</groupId>
 	<artifactId>powergen-parent</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<packaging>jar</packaging>
+	<packaging>pom</packaging>
 	<name>PowerGen parent POM</name>
 
 	<prerequisites>
@@ -72,13 +72,25 @@
 
 						<configuration>
 							<target>
+								<taskdef resource="net/sf/antcontrib/antlib.xml"/>
 								<!-- https://stackoverflow.com/questions/6733684/run-ant-from-java -->
-								<ant antfile="${project.basedir}/../powergen-parent/generate.xml"
-									target="generate" inheritAll="true" inheritRefs="true">
-									<property name="maven.project.name" value="${project.name}" />
-									<property name="maven.project.artifactId" value="${project.artifactId}" />
-									<property name="maven.project.groupId" value="${project.groupId}" />
-								</ant>
+								<property name="homeDir" value="${project.basedir}"/>
+								<echo message="base dir = ${homeDir}" />
+
+								<if>
+									<not>
+										<available file="${project.basedir}/generate.groovy" />
+									</not>
+									<then>
+										<get src="https://raw.githubusercontent.com/jiangjianbo/powergen/master/powergen-parent/generate.groovy"
+											 dest="${project.basedir}/generate.groovy"
+											 skipexisting="true" tryGzipEncoding="true" />
+									</then>
+								</if>
+
+								<echo message="download groovy complete" />
+								<script language="groovy" src="${project.basedir}/generate.groovy">
+								</script>
 							</target>
 						</configuration>
 						<goals>
@@ -90,12 +102,14 @@
                         <phase>pre-clean</phase>
                         <configuration>
                             <target>
+								<!--
                                 <ant antfile="${project.basedir}/../powergen-parent/generate.xml"
                                     target="clean" inheritAll="true" inheritRefs="true">
                                     <property name="maven.project.name" value="${project.name}" />
                                     <property name="maven.project.artifactId" value="${project.artifactId}" />
                                     <property name="maven.project.groupId" value="${project.groupId}" />
                                 </ant>
+                                -->
                             </target>
                         </configuration>
                         <goals>

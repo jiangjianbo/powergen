@@ -2056,7 +2056,7 @@ service * with serviceImpl
 //System.exit(0)
 
 
-String homeDir="/Users/jiangjianbo/work/tech/powergen/powergen-test"
+//String homeDir="/Users/jiangjianbo/work/tech/powergen/powergen-test"
 // 增加UI层的目的是啥？
 [
     /*new UILayer(), */
