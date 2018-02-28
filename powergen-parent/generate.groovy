@@ -1387,7 +1387,7 @@ class AnalysisWithActionGenerator extends AnalysisGenerator{
     }
 
     def actions = [
-            "pg-extends": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+            "pg-extends": {String entityName, def relationNames, def reverseRelationNames, File file, String optionKey, def optionValue ->
                 assert "$optionValue".isEmpty() == false: "pg-extends require agrument"
                 assert "$optionValue".matches(/\s*\w+\s*(@\w*(\s*,\s*\w+)*)?/): "pg-extends require only one class name"
 
@@ -1398,13 +1398,13 @@ class AnalysisWithActionGenerator extends AnalysisGenerator{
                     ant.replaceregexp(
                             //         $1                   $2             $3                        $4     $5
                             match: /^(\s*)public\s+class\s+(\w+)([\s\r\n]+extends[\s\r\n]+(\w+))?([\s\r\n]+implements\s+\w+\s*(,\s*\w+\s*)*)?\s*\{/,
-                            replace: "\\1/* \\3 */\n\\1public class \\2 extends ${oval} \\5 {", flags: "gm"){
+                            replace: "\\1public class \\2 extends ${oval} \\5 { /* \\3 */  ", flags: "gm"){
                         fileset(file: "${file.absoluteFile}")
                     }
 
                 }
             },
-            "pg-implements": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+            "pg-implements": {String entityName, def relationNames, def reverseRelationNames, File file, String optionKey,  def optionValue ->
                 assert "$optionValue".isEmpty() == false: "pg-implements require agrument"
                 assert "$optionValue".matches(/\s*\w+\s*(,\s*\w+)*(\s*@\w*(\s*,\s*\w+)*)?/): "pg-implements require one or more class name"
 
@@ -1419,10 +1419,13 @@ class AnalysisWithActionGenerator extends AnalysisGenerator{
 
                 }
             },
-            "pg-annotation": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+            "pg-annotation": {String entityName, def relationNames, def reverseRelationNames, File file, String optionKey, def optionValue ->
 
             },
-            "pg-state": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+            "pg-@": {String entityName, def relationNames, def reverseRelationNames, File file, String optionKey, def optionValue ->
+
+            },
+            "pg-state": {String entityName, def relationNames, def reverseRelationNames, File file, String optionKey, def optionValue ->
                 String filename = file.name
                 if( filename == "${entityName}Resource.java" ){
                     println("\tpg-state of $filename ")
@@ -1484,19 +1487,19 @@ class AnalysisWithActionGenerator extends AnalysisGenerator{
                     )
                 }
             },
-            "pg-entity": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+            "pg-entity": {String entityName, def relationNames, def reverseRelationNames, File file, String optionKey, def optionValue ->
 
             },
-            "pg-map-to": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+            "pg-map-to": {String entityName, def relationNames, def reverseRelationNames, File file, String optionKey, def optionValue ->
 
             },
-            "pg-view": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+            "pg-view": {String entityName, def relationNames, def reverseRelationNames, File file, String optionKey, def optionValue ->
 
             },
-            "pg-relationship": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+            "pg-relationship": {String entityName, def relationNames, def reverseRelationNames, File file, String optionKey, def optionValue ->
 
             },
-            "pg-relation-dir": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+            "pg-relation-dir": {String entityName, def relationNames, def reverseRelationNames, File file, String optionKey, def optionValue ->
 
             },
     ]
@@ -1513,12 +1516,23 @@ class AnalysisWithActionGenerator extends AnalysisGenerator{
         println("=== processing entity $entityName ==")
         options.each{key, val ->
             def func = actions[key]
-            if( func != null ) {
-                files.each{
-                    println("\t\t\t $entityName $key $val $it ")
-                    func(entityName, relationNames, reverseRelationNames, it, val)
+            if( func == null ) {
+                def len = 0, selK = null
+                // 如果没找到 action， 则将action的内容列出，取匹配最长的进行处理
+                actions.keySet().each {
+                    if( key.startsWith(it) && it.length() > len ){
+                        len = it.length()
+                        selK = it
+                    }
                 }
 
+                if( selK != null ) func = actions[selK]
+            }
+            if( func != null ){
+                files.each{
+                    println("\t\t\t $entityName $key $val $it ")
+                    func(entityName, relationNames, reverseRelationNames, it, key, val)
+                }
             }
         }
 
@@ -2008,8 +2022,8 @@ service * with serviceImpl
 
 }
 
-new BoGenerator("/Users/jiangjianbo/work/tech/powergen/adam2-demo").generate()
-System.exit(0)
+//new BoGenerator("/Users/jiangjianbo/work/tech/powergen/adam2-demo").generate()
+//System.exit(0)
 
 
 class PoGenerator extends AnalysisWithActionGenerator{
