@@ -347,6 +347,49 @@ assert "" == "abc".rightIndexOf("abc")
 
 
 /**
+ * 带 * 的匹配
+ * @param str
+ * @param matcher
+ * @return
+ */
+String.metaClass.wildMatch = {String matcher ->
+    if( matcher == null || matcher.length() == 0 ) return false
+
+    String str = delegate
+    String[] parts = matcher.split(/\*+/)
+    int pos = 0
+    for (int i = 0; i < parts.length; i++) {
+        if( parts[i].length() == 0 ) continue
+
+        int s = str.indexOf(parts[i], pos)
+        if( s == -1 ){
+            return false
+        } else {
+            pos = s + parts[i].length() + 1
+        }
+    }
+
+    return true
+}
+
+assert  "abc".wildMatch("abc")
+assert  "abc".wildMatch("a")
+assert  "abc".wildMatch("bc")
+assert  "abc".wildMatch("c")
+assert  "abc".wildMatch("") == false
+assert  "abc".wildMatch("a*c")
+assert  "abc".wildMatch("*bc")
+assert  "abc".wildMatch("ab*")
+assert  "abc".wildMatch("*b*")
+assert  "abc".wildMatch("*")
+assert  "abcd".wildMatch("*b*d")
+assert  "1abcd1".wildMatch("*b*d")
+assert  "1abcd12".wildMatch("*b*d*")
+assert  "a123".wildMatch("*b*d*") == false
+assert  "a123".wildMatch("*b*") == false
+
+
+/**
  * 移除任何匹配的前缀
  */
 String.metaClass.removeAnyPrefix = { String ... prefixs ->
@@ -1241,7 +1284,7 @@ class AnalysisGenerator extends Generator{
 
 /*
 <!--  目前 jdl 中每一个实体可以指定如下的标记，需要附加一些标准的处理过程插件
-pg-inherits XXX, pg-implements XXX 指定实体的基类或者接口实现
+pg-extends: XXX, pg-implements: XXX 指定实体的基类或者接口实现
 pg-@XXX(xxx) 附加实体一些annotation
 pg-state: none,create,delete,edit,detail,list, list-edit，手工属性，默认全部都要
 pg-entity: YYY 当前对象是 YYY 对象的简化， 手工属性。处理时会将当前对象复制到 YYY 的目录下并改名
@@ -1306,12 +1349,75 @@ class AnalysisWithActionGenerator extends AnalysisGenerator{
         result
     }
 
-    def actions = [
-            "pg-inherits": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+    /**
+     * 对于不带 “@” 符号的，默认要和 entityName 同名
+     * @return
+     */
+    boolean matchActionOption(String entityName, String fileName, String optionValue){
+        String fname = fileName.leftLastIndexOf(".")
 
+        // 没有 @ 则表示严格和实体名匹配
+        if( -1 == optionValue.indexOf('@') ){
+            return entityName == fname
+        }else {
+            String[] parts = optionValue.rightIndexOf("@").trim().split(",")
+            if( parts.length == 0 ){    // 如果只有单个 @，则匹配所有
+                return true
+            } else {
+                // 否则一个一个拿出来匹配，支持尾部匹配 和 通配符号匹配
+                for (int i = 0; i < parts.length; i++) {
+                    if( fname.endsWith(parts[i]) || fname.wildMatch(parts[i])){
+                        return true
+                    }
+                }
+            }
+        }
+
+        return false
+    }
+
+    String extractActionValue(String optionValue){
+        int pos = optionValue.indexOf('@')
+        if( pos != -1 ){
+            return optionValue.substring(0, pos)
+        } else {
+            return optionValue
+        }
+
+    }
+
+    def actions = [
+            "pg-extends": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+                assert "$optionValue".isEmpty() == false: "pg-extends require agrument"
+                assert "$optionValue".matches(/\s*\w+\s*(@\w*(\s*,\s*\w+)*)?/): "pg-extends require only one class name"
+
+                String filename = file.name
+                if( filename.endsWith(".java") && matchActionOption(entityName, filename, optionValue) ){
+                    String oval = extractActionValue(optionValue)
+                    // replace and save extends
+                    ant.replaceregexp(
+                            //         $1                   $2             $3                        $4     $5
+                            match: /^(\s*)public\s+class\s+(\w+)([\s\r\n]+extends[\s\r\n]+(\w+))?([\s\r\n]+implements\s+\w+\s*(,\s*\w+\s*)*)?\s*\{/,
+                            replace: "\\1/* \\3 */\n\\1public class \\2 extends ${oval} \\5 {", flags: "gm"){
+                        fileset(file: "${file.absoluteFile}")
+                    }
+
+                }
             },
             "pg-implements": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
+                assert "$optionValue".isEmpty() == false: "pg-implements require agrument"
+                assert "$optionValue".matches(/\s*\w+\s*(,\s*\w+)*(\s*@\w*(\s*,\s*\w+)*)?/): "pg-implements require one or more class name"
 
+                String filename = file.name
+                if( filename.endsWith(".java") ){
+                    ant.replaceregexp(
+                            //         $1          $2                          $3             $4                        $5     $6                     $7      $8
+                            match: /^(\s*)public\s+((?:class)|(?:interface))\s+(\w+)([\s\r\n]+extends[\s\r\n]+(\w+))?([\s\r\n]+implements\s+(\w+)\s*(,\s*\w+\s*)*)?\s*\{/,
+                            replace: "\\1public \\2 \\3 \\4 implements $optionValue, \\7 \\8 {", flags: "gm"){
+                        fileset(file: "${file.absoluteFile}")
+                    }
+
+                }
             },
             "pg-annotation": {String entityName, def relationNames, def reverseRelationNames, File file, def optionValue ->
 
@@ -1409,7 +1515,7 @@ class AnalysisWithActionGenerator extends AnalysisGenerator{
             def func = actions[key]
             if( func != null ) {
                 files.each{
-                    println("\t\t\t $entityName $key $it ")
+                    println("\t\t\t $entityName $key $val $it ")
                     func(entityName, relationNames, reverseRelationNames, it, val)
                 }
 
@@ -1902,8 +2008,8 @@ service * with serviceImpl
 
 }
 
-//new BoGenerator("/Users/jiangjianbo/work/tech/powergen/powergen-test").generate()
-//System.exit(0)
+new BoGenerator("/Users/jiangjianbo/work/tech/powergen/adam2-demo").generate()
+System.exit(0)
 
 
 class PoGenerator extends AnalysisWithActionGenerator{
