@@ -1,25 +1,47 @@
-视图层对象的命名规范
+# 说明
 
-界面操作基本元素包括：
-1. 创建（Create）：创建新增一个对象，需要包含对象的全部信息
-2. 编辑（Edit）：编辑一个存在的对象，需要包含对象的全部信息
-3. 查询（Search）：通过条件搜索对象，并且列表列出附和条件的对象。一般只需要列举对象的简要信息（Brief）
-4. 删除（Delete）：删除一个对象。不需要查看对象的信息，除了ID之外
-5. 概要查看（Brief）：只读形式查看对象概要属性
-5. 详细查看（Info）：只读形式查看对象属性，包含对象的全部信息
+## 基础架构
 
-因此，一个独立的界面对象，默认是 XxxView 格式，表示全量信息， XxxBriefView 表示简要信息， XxxSearchView 表示查找条件对象。
-如果有对象比较特殊，例如用户修改密码，则使用“对象名+动词+View”的格式，UserChangePasswordView。
+本工具需要配合使用 [jHipster](http://www.jhipster.tech) 进行内容的生成。
+并且会在 [JDL](http://www.jhipster.tech/jdl/) 的实体定义中加入一些控制标签，
+实现对代码的二次修改和处理。
 
-在操作上，有些界面对象是不需要完整的操作的，例如搜索对象XxxSearchView就只有Edit状态的界面。
+工具会对 jHipster 的代码进行重新整理，并提取存放到新结构中。新结构将会分成很多
+新的模块工程目录，按照模块功能进行拆分。
 
--detail 对应只读界面
-s.html 对应列表
--dialog 对应编辑
--delete-dialog 对应删除确认，只有一个id显示
+每一个模块工程都是带界面和后台代码的独立部分，一般包含多个project，
+能够适应微服务方式的部署。
+
+## 控制标签
+
+* pg-extends: XXX, pg-implements: XXX
+
+    XXX 指定实体的基类或者接口实现，其中的XXX格式定义为 value\[@\[限定,限定,...\]\]
+* pg-@XXX(xxx) 
+
+    附加实体一些annotation
+* pg-state: 
+
+    手工属性，默认全部都要。取值范围为：
+    none,create,delete,edit,detail,list, list-edit
+* pg-entity: YYY 当前对象是 YYY 对象的简化， 手工属性。
+
+    处理时会将当前对象复制到 YYY 的目录下并改名
+* pg-map-to: YYY   
+
+    映射view对象到YYY对象的BO，手工属性
+* pg-view：XXX,YYY, ... 
+
+    帮助在 app/views/下生成特定的视图，里边包含 directive 组合的页面，手工属性
+* pg-relationship-XXX: 
+
+    当前对象和 XXX 实体的关联关系，自动生成属性
+* pg-relation-dir-XXX: 
+
+    当前对象和 XXx 实体关系的关联方向，自动生成属性
 
 
-视图层对象存在相互覆盖的情况，通过在 entity的注释里加入 func:create,edit,brief,detail,delete
+
 
 
 
