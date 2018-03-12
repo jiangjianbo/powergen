@@ -23,6 +23,8 @@
 	<properties>
 		<plugin.antrun.version>1.7</plugin.antrun.version>
 		<maven.version>3.0.0</maven.version>
+		<frameworkPackage>com.github.powergen.framework</frameworkPackage>
+		<frameworkName>jHipsterFramework</frameworkName>
 	</properties>
 
 	<dependencies>
@@ -75,7 +77,16 @@
 								<taskdef resource="net/sf/antcontrib/antlib.xml"/>
 								<!-- https://stackoverflow.com/questions/6733684/run-ant-from-java -->
 								<property name="homeDir" value="${project.basedir}"/>
+
 								<echo message="base dir = ${homeDir}" />
+
+								<fail message="require property frameworkPackage" >
+									<condition>
+										<equals arg1="${frameworkPackage}" arg2="" trim="true" />
+									</condition>
+								</fail>
+
+								<echo message="framework package = ${frameworkPackage}, ${frameworkName}" />
 
 								<if>
 									<not>

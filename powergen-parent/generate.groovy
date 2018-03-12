@@ -1,3 +1,5 @@
+import groovy.transform.stc.ClosureParams
+import groovy.transform.stc.SimpleType
 import groovy.xml.XmlUtil
 
 import java.util.regex.Pattern
@@ -540,6 +542,8 @@ File.metaClass.checksum = {
  */
 class Generator{
     static AntBuilder ant = new AntBuilder()
+    static String frameworkArtifactId
+    static String frameworkGroupId
 
     /**
      * 存放命令行的参数
@@ -560,6 +564,8 @@ class Generator{
 
         extractInfoFromPom(this.baseDir)
 
+        checkProperties()
+
         assert !"${artifactId}".isEmpty()
         assert !"${groupId}".isEmpty()
 
@@ -571,6 +577,8 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
     artifactId: ${artifactId}
         """)
     }
+
+    def checkProperties(){}
 
     // 从 pom.xml 中获取 groupId 和 artifactId
     private void extractInfoFromPom(String baseDir){
@@ -1205,8 +1213,9 @@ class AnalysisGenerator extends Generator{
      * @param toPom     目标 pom 的路径
      * @param nodes     需要修改的节点数组，内容是 [ xpath: value ]
      * @param dependencies  需要添加的依赖，内容是 [ group:artifact:version, ... ]
+     * @param callback  回调函数，用于对 pom 的xml 进行自定义的操作
      */
-    def copyPomXml(String fromPom, String toPom, def nodes, def dependencies){
+    def copyPomXml(String fromPom, String toPom, def nodes, def dependencies,  @ClosureParams(value=SimpleType.class, options="groovy.util.Node") Closure<Boolean> callback = null){
         ant.copy(file: fromPom, tofile: toPom, overwrite: "true")
         assert toPom.toFile().exists()
 
@@ -1219,6 +1228,8 @@ class AnalysisGenerator extends Generator{
             curnode.value = val
         }
 
+        if( callback != null && callback instanceof Closure) callback(pom)
+
         if( dependencies != null ) dependencies.each{
             def arr = it.split(/\s*:\s*/)
             def grp = arr.size() > 0 ? arr[0]: null
@@ -1227,6 +1238,7 @@ class AnalysisGenerator extends Generator{
 
             if( !(grp == null && art == null && ver == null) ){
                 def node = pom.dependencies[0]
+                if( node == null ) node = pom.appendNode("dependencies")
                 def dep = node.appendNode("dependency")
                 if( grp != null ) dep.appendNode("groupId", grp)
                 if( art != null ) dep.appendNode("artifactId", art)
@@ -1572,6 +1584,9 @@ class FrameworkGenerator extends AnalysisWithActionGenerator{
 
     public FrameworkGenerator(String baseDir){
         super(baseDir, "framework")
+
+        this.groupId = frameworkGroupId
+        this.artifactId = frameworkArtifactId
     }
 
     boolean checkJdlUpdate(String jdlSrcFile, String jdlTarget){ true }
@@ -1664,7 +1679,7 @@ service * with serviceImpl
 
         copyAndReplaceFiles("${subProjectDir}/framework",
                 [
-                        [dir:"${targetDir}", includes:["*.*", ".mvn/**/*.*", "gulp/*.*"], excludes:[ "*.jdl", "pom.xml"]]
+                        [dir:"${targetDir}", includes:["*", "*.*", ".mvn/**/*.*", "gulp/*.*"], excludes:[ "*.jdl", "pom.xml", "0.*"]]
                 ], [ ]
         )
 
@@ -1675,21 +1690,30 @@ service * with serviceImpl
         // 创建 pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/framework-util/pom.xml",
                 [
-                        "groupId": "$projectGroupId",
+                        "groupId": "$frameworkGroupId",
                         "artifactId": "framework-util",
                         "packaging": "jar",
                         "name": "$artifactId framework util project"
-                ], [ ]
-        )
+                ], [
+                        "org.springframework.boot:spring-boot-starter-data-jpa",
+                        "org.springframework.boot:spring-boot-starter-web",
+                        "org.slf4j:slf4j-api"
+                ]
+        ){ pom ->
+            pom.remove(pom.properties)
+            pom.remove(pom.dependencies)
+            pom.remove(pom.build)
+            pom.remove(pom.profiles)
+        }
 
         // 创建 pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/framework/pom.xml",
                 [
-                        "groupId": "$projectGroupId",
+                        "groupId": "$frameworkGroupId",
                         "artifactId": "framework",
                         "name": "$artifactId framework project"
                 ], [
-                        "${projectGroupId}:framework-util:$version" // 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:$version" // 依赖 framework-util
                 ]
         )
 
@@ -1783,9 +1807,9 @@ dto * with mapstruct
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/repository/${entityName}Repository.java".isFile()
         
         replaceClass("$tempSrcJavaDir", [
-                [from: "${groupId}.service.mapper.EntityMapper", to: "${projectGroupId}.framework.service.mapper.EntityMapper"],
-                [from: "${groupId}.web.rest.util.HeaderUtil", to: "${projectGroupId}.framework.web.rest.util.HeaderUtil"],
-                [from: "${groupId}.web.rest.util.PaginationUtil", to: "${projectGroupId}.framework.web.rest.util.PaginationUtil"],
+                [from: "${groupId}.service.mapper.EntityMapper", to: "${frameworkGroupId}.service.mapper.EntityMapper"],
+                [from: "${groupId}.web.rest.util.HeaderUtil", to: "${frameworkGroupId}.web.rest.util.HeaderUtil"],
+                [from: "${groupId}.web.rest.util.PaginationUtil", to: "${frameworkGroupId}.web.rest.util.PaginationUtil"],
                 // 移动 DTO 的命名空间
                 [ from: "${groupId}.service.dto.${entityName}DTO", to: "${groupId}.dto.${entityName}DTO"] ,
                 // 移动 Resource 的命名空间
@@ -1797,7 +1821,7 @@ dto * with mapstruct
                 // 将 repository 改造成 BO Service
                 [ from: "${groupId}.repository.${entityName}Repository", to:"${projectGroupId}.application.service.${boName}Service"]
         ], files){
-            replaceText(/\s+extends\s+EntityMapper\b/, " extends ${projectGroupId}.framework.service.mapper.EntityMapper".toRegexp(), "gm", files)
+            replaceText(/\s+extends\s+EntityMapper\b/, " extends ${frameworkGroupId}.service.mapper.EntityMapper".toRegexp(), "gm", files)
             replaceText(/import\s+${groupId.toRegexp()}\.domain\.\*\s*;/, /import ${projectGroupId.toRegexp()}\.application\.service\.dto\.\*;/, "gm", files)
         }
 
@@ -2201,11 +2225,18 @@ service * with serviceImpl
 //new PoGenerator("/Users/jiangjianbo/work/tech/powergen/powergen-test").generate()
 //System.exit(0)
 
-
+//String frameworkPackage="cn.gyxr.saas"
+//String frameworkName="gyxrframe"
 //String homeDir="/Users/jiangjianbo/work/tech/powergen/powergen-test"
+//String homeDir="/Users/jiangjianbo/work/tech/powergen/adam2-demo"
+
+Generator.frameworkGroupId = frameworkPackage
+Generator.frameworkArtifactId = frameworkName
+
 // 增加UI层的目的是啥？
 [
     /*new UILayer(), */
+//    new FrameworkGenerator(homeDir)
     new FrameworkGenerator(homeDir),
     new VoGenerator(homeDir),
     new BoGenerator(homeDir),
