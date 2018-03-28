@@ -93,22 +93,22 @@ String.metaClass.upperFirst = {
     delegate.length() > 0 ? delegate[0].toUpperCase() + delegate.substring(1) : "";
 }
 
-assert "Abc" == "abc".upperFirst()
-assert "Abc" == "Abc".upperFirst()
-assert "_abc" == "_abc".upperFirst()
-assert "" == "".upperFirst()
-assert "0abc" == "0abc".upperFirst()
+// assert "Abc" == "abc".upperFirst()
+// assert "Abc" == "Abc".upperFirst()
+// assert "_abc" == "_abc".upperFirst()
+// assert "" == "".upperFirst()
+// assert "0abc" == "0abc".upperFirst()
 
 
 String.metaClass.lowerFirst = {
     delegate.length() > 0 ? delegate[0].toLowerCase() + delegate.substring(1) : "";
 }
 
-assert "abc" == "abc".lowerFirst()
-assert "abc" == "Abc".lowerFirst()
-assert "_abc" == "_abc".lowerFirst()
-assert "" == "".lowerFirst()
-assert "0abc" == "0abc".lowerFirst()
+// assert "abc" == "abc".lowerFirst()
+// assert "abc" == "Abc".lowerFirst()
+// assert "_abc" == "_abc".lowerFirst()
+// assert "" == "".lowerFirst()
+// assert "0abc" == "0abc".lowerFirst()
 
 String.metaClass.camelCase = {
     def arr = delegate.split("\\-")
@@ -124,12 +124,12 @@ String.metaClass.camelCase = {
     return sb.toString();
 }
 
-assert "a1233Bcde" == "a-1-2-3-3-bcde".camelCase()
-assert "aBcdEdf" == "a-bcd-edf".camelCase()
-assert "abc" == "abc".camelCase()
-assert "a" == "a".camelCase()
-assert "1" == "1".camelCase()
-assert "" == "".camelCase()
+// assert "a1233Bcde" == "a-1-2-3-3-bcde".camelCase()
+// assert "aBcdEdf" == "a-bcd-edf".camelCase()
+// assert "abc" == "abc".camelCase()
+// assert "a" == "a".camelCase()
+// assert "1" == "1".camelCase()
+// assert "" == "".camelCase()
 
 String.metaClass.dashCase = {
     def str = delegate.replaceAll(/([A-Z]+)/){ part ->
@@ -142,19 +142,19 @@ String.metaClass.dashCase = {
     return str
 }
 
-assert "abc" == "abc".dashCase()
-assert "aa" == "AA".dashCase()
-assert "aab" == "AAb".dashCase()
-assert "a-ab" == "A_Ab".dashCase()
-assert "c-aab" == "cAAb".dashCase()
-assert "abc" == "Abc".dashCase()
-assert "a-ab-b" == "aAbB".dashCase()
-assert "a-ab-b1c2" == "aAbB1c2".dashCase()
-assert "ab-b" == "AbB".dashCase()
-assert "123a-ab-b" == "123aAbB".dashCase()
-assert "1.2" == "1.2".dashCase()
-assert "1" == "1".dashCase()
-assert "" == "".dashCase()
+// assert "abc" == "abc".dashCase()
+// assert "aa" == "AA".dashCase()
+// assert "aab" == "AAb".dashCase()
+// assert "a-ab" == "A_Ab".dashCase()
+// assert "c-aab" == "cAAb".dashCase()
+// assert "abc" == "Abc".dashCase()
+// assert "a-ab-b" == "aAbB".dashCase()
+// assert "a-ab-b1c2" == "aAbB1c2".dashCase()
+// assert "ab-b" == "AbB".dashCase()
+// assert "123a-ab-b" == "123aAbB".dashCase()
+// assert "1.2" == "1.2".dashCase()
+// assert "1" == "1".dashCase()
+// assert "" == "".dashCase()
 
 
 String.metaClass.checksum = {
@@ -167,8 +167,8 @@ String.metaClass.checksum = {
     md.digest().toHex()
 }
 
-assert "abc".checksum() == "abc".checksum()
-assert "abc1".checksum() != "abc".checksum()
+// assert "abc".checksum() == "abc".checksum()
+// assert "abc1".checksum() != "abc".checksum()
 
 
 String.metaClass.toFile = {
@@ -181,40 +181,40 @@ String.metaClass.isFile = {
     return file.exists() && file.isFile()
 }
 
-assert true == "/etc/passwd".isFile()
-assert false == "/etc/".isFile()
-assert false == "/ab0012343".isFile()
+// assert true == "/etc/passwd".isFile()
+// assert false == "/etc/".isFile()
+// assert false == "/ab0012343".isFile()
 
 String.metaClass.isDirectory = {
     def file = new File(delegate)
     return file.exists() && file.isDirectory()
 }
 
-assert true == "/".isDirectory()
+// assert true == "/".isDirectory()
 //assert true == "~".isDirectory()
-assert true == ".".isDirectory()
-assert false == "/etc/passwd".isDirectory()
-assert false == "/ab0012343".isDirectory()
+// assert true == ".".isDirectory()
+// assert false == "/etc/passwd".isDirectory()
+// assert false == "/ab0012343".isDirectory()
 
 String.metaClass.canonicalPath = {
     def file = new File(delegate)
     return file.exists() ? file.canonicalPath : delegate
 }
 
-assert "/" == "/".canonicalPath()
-assert "/bin/bash" == "/bin/bash".canonicalPath()
-assert "/bin" == "/bin/../././././bin/./.".canonicalPath()
-assert "/bin" == "/bin/../bin".canonicalPath()
-assert "/bin/bash" == "/bin/../././././bin/././././bash".canonicalPath()
+// assert "/" == "/".canonicalPath()
+// assert "/bin/bash" == "/bin/bash".canonicalPath()
+// assert "/bin" == "/bin/../././././bin/./.".canonicalPath()
+// assert "/bin" == "/bin/../bin".canonicalPath()
+// assert "/bin/bash" == "/bin/../././././bin/././././bash".canonicalPath()
 
 String.metaClass.lastChar = {
     def size = delegate.length()
     size > 0 ? delegate.charAt(size - 1) : null
 }
 
-assert 'c' == "abc".lastChar()
-assert 'a' == "a".lastChar()
-assert null == "".lastChar()
+// assert 'c' == "abc".lastChar()
+// assert 'a' == "a".lastChar()
+// assert null == "".lastChar()
 
 
 String.metaClass.firstChar = {
@@ -222,9 +222,9 @@ String.metaClass.firstChar = {
     size > 0 ? delegate.charAt(0) : null
 }
 
-assert 'a' == "abc".firstChar()
-assert 'a' == "a".firstChar()
-assert null == "".firstChar()
+// assert 'a' == "abc".firstChar()
+// assert 'a' == "a".firstChar()
+// assert null == "".firstChar()
 
 
 /**
@@ -240,14 +240,14 @@ String.metaClass.left = { len ->
         return delegate.substring(0, Math.max(size + len, 0))
 }
 
-assert "" == "abc".left(0)
-assert "" == "".left(0)
-assert "a" == "abc".left(1)
-assert "ab" == "abc".left(2)
-assert "a" == "abc".left(-2)
-assert "ab" == "abc".left(-1)
-assert "abc" == "abc".left(10)
-assert "" == "abc".left(-10)
+// assert "" == "abc".left(0)
+// assert "" == "".left(0)
+// assert "a" == "abc".left(1)
+// assert "ab" == "abc".left(2)
+// assert "a" == "abc".left(-2)
+// assert "ab" == "abc".left(-1)
+// assert "abc" == "abc".left(10)
+// assert "" == "abc".left(-10)
 
 /**
  * 返回寻找位置左侧的字符串
@@ -264,15 +264,15 @@ String.metaClass.leftIndexOf = {String ch ->
         return ""
 }
 
-assert "" == "abc".leftIndexOf(null)
-assert "" == "abc".leftIndexOf("")
-assert "" == "abc".leftIndexOf("e")
+// assert "" == "abc".leftIndexOf(null)
+// assert "" == "abc".leftIndexOf("")
+// assert "" == "abc".leftIndexOf("e")
 
-assert "" == "abc".leftIndexOf("a")
-assert "a" == "abc".leftIndexOf("b")
-assert "ab" == "abc".leftIndexOf("c")
-assert "" == "abc".leftIndexOf("abc")
-assert "a" == "abc".leftIndexOf("bc")
+// assert "" == "abc".leftIndexOf("a")
+// assert "a" == "abc".leftIndexOf("b")
+// assert "ab" == "abc".leftIndexOf("c")
+// assert "" == "abc".leftIndexOf("abc")
+// assert "a" == "abc".leftIndexOf("bc")
 
 /**
  * 返回寻找最后位置左侧的字符串
@@ -289,14 +289,14 @@ String.metaClass.leftLastIndexOf = {String ch ->
         return ""
 }
 
-assert "" == "abc".leftLastIndexOf(null)
-assert "" == "abc".leftLastIndexOf("")
-assert "" == "abc".leftLastIndexOf("ee")
-assert "" == "abc".leftLastIndexOf("a")
-assert "a" == "abc".leftLastIndexOf("b")
-assert "ab" == "abc".leftLastIndexOf("c")
-assert "" == "abc".leftLastIndexOf("ab")
-assert "a" == "abc".leftLastIndexOf("bc")
+// assert "" == "abc".leftLastIndexOf(null)
+// assert "" == "abc".leftLastIndexOf("")
+// assert "" == "abc".leftLastIndexOf("ee")
+// assert "" == "abc".leftLastIndexOf("a")
+// assert "a" == "abc".leftLastIndexOf("b")
+// assert "ab" == "abc".leftLastIndexOf("c")
+// assert "" == "abc".leftLastIndexOf("ab")
+// assert "a" == "abc".leftLastIndexOf("bc")
 
 
 /**
@@ -312,14 +312,14 @@ String.metaClass.right = { len ->
         return delegate.substring(Math.min(-len, size))
 }
 
-assert "" == "abc".right(0)
-assert "" == "".right(0)
-assert "c" == "abc".right(1)
-assert "bc" == "abc".right(2)
-assert "c" == "abc".right(-2)
-assert "bc" == "abc".right(-1)
-assert "abc" == "abc".right(10)
-assert "" == "abc".right(-10)
+// assert "" == "abc".right(0)
+// assert "" == "".right(0)
+// assert "c" == "abc".right(1)
+// assert "bc" == "abc".right(2)
+// assert "c" == "abc".right(-2)
+// assert "bc" == "abc".right(-1)
+// assert "abc" == "abc".right(10)
+// assert "" == "abc".right(-10)
 
 /**
  * 返回寻找位置右侧的字符串
@@ -336,16 +336,16 @@ String.metaClass.rightIndexOf = {String ch ->
         return ""
 }
 
-assert "" == "abc".rightIndexOf(null)
-assert "" == "abc".rightIndexOf("")
-assert "" == "abc".rightIndexOf("kkk")
+// assert "" == "abc".rightIndexOf(null)
+// assert "" == "abc".rightIndexOf("")
+// assert "" == "abc".rightIndexOf("kkk")
 
-assert "bc" == "abc".rightIndexOf("a")
-assert "c" == "abc".rightIndexOf("b")
-assert "" == "abc".rightIndexOf("c")
-assert "c" == "abc".rightIndexOf("ab")
-assert "" == "abc".rightIndexOf("bc")
-assert "" == "abc".rightIndexOf("abc")
+// assert "bc" == "abc".rightIndexOf("a")
+// assert "c" == "abc".rightIndexOf("b")
+// assert "" == "abc".rightIndexOf("c")
+// assert "c" == "abc".rightIndexOf("ab")
+// assert "" == "abc".rightIndexOf("bc")
+// assert "" == "abc".rightIndexOf("abc")
 
 
 /**
@@ -374,21 +374,21 @@ String.metaClass.wildMatch = {String matcher ->
     return true
 }
 
-assert  "abc".wildMatch("abc")
-assert  "abc".wildMatch("a")
-assert  "abc".wildMatch("bc")
-assert  "abc".wildMatch("c")
-assert  "abc".wildMatch("") == false
-assert  "abc".wildMatch("a*c")
-assert  "abc".wildMatch("*bc")
-assert  "abc".wildMatch("ab*")
-assert  "abc".wildMatch("*b*")
-assert  "abc".wildMatch("*")
-assert  "abcd".wildMatch("*b*d")
-assert  "1abcd1".wildMatch("*b*d")
-assert  "1abcd12".wildMatch("*b*d*")
-assert  "a123".wildMatch("*b*d*") == false
-assert  "a123".wildMatch("*b*") == false
+// assert  "abc".wildMatch("abc")
+// assert  "abc".wildMatch("a")
+// assert  "abc".wildMatch("bc")
+// assert  "abc".wildMatch("c")
+// assert  "abc".wildMatch("") == false
+// assert  "abc".wildMatch("a*c")
+// assert  "abc".wildMatch("*bc")
+// assert  "abc".wildMatch("ab*")
+// assert  "abc".wildMatch("*b*")
+// assert  "abc".wildMatch("*")
+// assert  "abcd".wildMatch("*b*d")
+// assert  "1abcd1".wildMatch("*b*d")
+// assert  "1abcd12".wildMatch("*b*d*")
+// assert  "a123".wildMatch("*b*d*") == false
+// assert  "a123".wildMatch("*b*") == false
 
 
 /**
@@ -407,11 +407,11 @@ String.metaClass.removeAnyPrefix = { String ... prefixs ->
     maxMatchLen == 0 ? delegate:  delegate.substring(maxMatchLen)
 }
 
-assert "" == "".removeAnyPrefix("cde", "a", "abc", "abc2")
-assert "" == "abc".removeAnyPrefix("cde", "a", "abc", "abc2")
-assert "1abc" == "1abc".removeAnyPrefix("cde", "a", "abc", "abc2")
-assert "bd" == "abd".removeAnyPrefix("cde", "a", "abc", "abc2")
-assert "111" == "abc111".removeAnyPrefix("cde", "a", "abc", "abc2")
+// assert "" == "".removeAnyPrefix("cde", "a", "abc", "abc2")
+// assert "" == "abc".removeAnyPrefix("cde", "a", "abc", "abc2")
+// assert "1abc" == "1abc".removeAnyPrefix("cde", "a", "abc", "abc2")
+// assert "bd" == "abd".removeAnyPrefix("cde", "a", "abc", "abc2")
+// assert "111" == "abc111".removeAnyPrefix("cde", "a", "abc", "abc2")
 
 /**
  * 移除任何匹配的前缀
@@ -429,10 +429,10 @@ String.metaClass.removeAnyPrefix = { char ... prefixs ->
     return delegate
 }
 
-assert "" == "".removeAnyPrefix('a', 'b', 'c')
-assert "d" == "d".removeAnyPrefix('a', 'b', 'c')
-assert "1" == "a1".removeAnyPrefix('a', 'b', 'c')
-assert "b1" == "ab1".removeAnyPrefix('a', 'b', 'c')
+// assert "" == "".removeAnyPrefix('a', 'b', 'c')
+// assert "d" == "d".removeAnyPrefix('a', 'b', 'c')
+// assert "1" == "a1".removeAnyPrefix('a', 'b', 'c')
+// assert "b1" == "ab1".removeAnyPrefix('a', 'b', 'c')
 
 /**
  * 按照正则表达式进行转义
@@ -448,11 +448,11 @@ String.metaClass.toRegexp = {
     sb.toString()
 }
 
-assert "" == "".toRegexp()
-assert "a" == /a/.toRegexp()
-assert "\\(a\\)" == /(a)/.toRegexp()
-assert "\\(" == /(/.toRegexp()
-assert "\\/" == "/".toRegexp()
+// assert "" == "".toRegexp()
+// assert "a" == /a/.toRegexp()
+// assert "\\(a\\)" == /(a)/.toRegexp()
+// assert "\\(" == /(/.toRegexp()
+// assert "\\/" == "/".toRegexp()
 
 /**
  * 将字符串修改为路径格式，并去掉末尾的路径分隔符
@@ -462,15 +462,15 @@ String.metaClass.path = {
     str.replaceFirst(/([\w\d\-]+)\/$/){ it[0].left(-1)   }
 }
 
-assert "/" == "/".path()
-assert "/a" == "/a".path()
-assert "/a" == "/a/".path()
-assert "a" == "a".path()
-assert "a" == "a/".path()
-assert "/a/1" == "/a/1".path()
-assert "a/1" == "a/1".path()
-assert "a" == "a////".path()
-assert "a/b/c/d" == "a\\b\\c/d\\".path()
+// assert "/" == "/".path()
+// assert "/a" == "/a".path()
+// assert "/a" == "/a/".path()
+// assert "a" == "a".path()
+// assert "a" == "a/".path()
+// assert "/a/1" == "/a/1".path()
+// assert "a/1" == "a/1".path()
+// assert "a" == "a////".path()
+// assert "a/b/c/d" == "a\\b\\c/d\\".path()
 
 /**
  * 将字符串修改为 windows 路径格式，并去掉末尾的路径分隔符
@@ -480,15 +480,15 @@ String.metaClass.winpath = {
     str.replaceAll(/\//, '\\\\')
 }
 
-assert "\\" == "/".winpath()
-assert "\\a" == "/a".winpath()
-assert "\\a" == "/a/".winpath()
-assert "a" == "a".winpath()
-assert "a" == "a/".winpath()
-assert "\\a\\1" == "/a/1".winpath()
-assert "a\\1" == "a/1".winpath()
-assert "a" == "a////".winpath()
-assert "a\\b\\c\\d" == "a\\b\\c/d\\".winpath()
+// assert "\\" == "/".winpath()
+// assert "\\a" == "/a".winpath()
+// assert "\\a" == "/a/".winpath()
+// assert "a" == "a".winpath()
+// assert "a" == "a/".winpath()
+// assert "\\a\\1" == "/a/1".winpath()
+// assert "a\\1" == "a/1".winpath()
+// assert "a" == "a////".winpath()
+// assert "a\\b\\c\\d" == "a\\b\\c/d\\".winpath()
 
 String.metaClass.relativePath = { String rootPath ->
     if( delegate.startsWith(rootPath) ) {
@@ -497,10 +497,10 @@ String.metaClass.relativePath = { String rootPath ->
         return ""
 }
 
-assert "b/c" == "a/b/c".relativePath("a")
-assert "c" == "a/b/c".relativePath("a/b")
-assert "" == "/a/b/c".relativePath("b/c")
-assert "" == "a/b/c".relativePath("/a")
+// assert "b/c" == "a/b/c".relativePath("a")
+// assert "c" == "a/b/c".relativePath("a/b")
+// assert "" == "/a/b/c".relativePath("b/c")
+// assert "" == "a/b/c".relativePath("/a")
 
 /**
  * 将字符串从路径格式转换为 package
@@ -509,12 +509,12 @@ String.metaClass.pathToPackage = {
     delegate.path().replaceAll(/[\\\/]+/, ".")
 }
 
-assert "" == "".pathToPackage()
-assert "a.b" == "a.b".pathToPackage()
-assert "a.b" == "a/b".pathToPackage()
-assert "a.b" == "a\\b".pathToPackage()
-assert "a" == "a".pathToPackage()
-assert "a.b" == "a/b/".pathToPackage()
+// assert "" == "".pathToPackage()
+// assert "a.b" == "a.b".pathToPackage()
+// assert "a.b" == "a/b".pathToPackage()
+// assert "a.b" == "a\\b".pathToPackage()
+// assert "a" == "a".pathToPackage()
+// assert "a.b" == "a/b/".pathToPackage()
 
 /**
  * 将字符串从 package 转换为 路径格式
@@ -523,9 +523,9 @@ String.metaClass.packageToPath = {
     delegate.replaceAll(/\.+/, "/")
 }
 
-assert "" == "".packageToPath()
-assert "a/b" == "a.b".packageToPath()
-assert "a" == "a".packageToPath()
+// assert "" == "".packageToPath()
+// assert "a/b" == "a.b".packageToPath()
+// assert "a" == "a".packageToPath()
 
 File.metaClass.checksum = {
     delegate.text.md5
@@ -781,6 +781,12 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
                     [ ! -d "${targetDir}/src" ] && echo "=====[${targetDir}/src] not generated======" && exit 1
                     echo "================generate from ${jdlName}======================"
                     yo jhipster:import-jdl fix-${jdlName} --force
+                    retcode=\$?
+                    if [ "\$retcode" -ne "0" -a ! -d "node_modules" ] ; then
+                        yarn --ignore-engines
+                        retcode=\$?
+                    fi
+                    exit \$retcode
                 fi
                 """)
         }
@@ -1262,29 +1268,29 @@ class AnalysisGenerator extends Generator{
         }
     }
 
-    void aaa(def v){
-        replaceClass("${tempSrcJavaDir}", "com.fogsun.example.view.domain.MemberView", "com.fogsun.example.view.domain123.MemberAbcView", [
-                [dir: "${tempSrcJavaDir}", includes: ["**/*.java"]]
-        ])
-    }
-
-    void dbbb(){
-        copyPomXml("$targetDir/pom.xml", "$targetDir/pom123.xml",
-                ["artifactId": "abc", "parent/version":"1.2.3"],
-                ["abc:cde:1", "mmm:ddd:new1"]
-        )
-    }
-
-    void ddd(){
-        "$subProjectDir/pom.xml".toFile().delete()
-        postProcess()
-        addPomModule("$subProjectDir/pom.xml", "abc")
-        addPomModule("$subProjectDir/pom.xml", "abc")
-        addPomModule("$subProjectDir/pom.xml", "abc-123")
-        addPomModule("$subProjectDir/pom.xml", "abc-123")
-        addPomModule("$subProjectDir/pom.xml", "abc123")
-        println("$subProjectDir/pom.xml".toFile().text)
-    }
+//    void aaa(def v){
+//        replaceClass("${tempSrcJavaDir}", "com.fogsun.example.view.domain.MemberView", "com.fogsun.example.view.domain123.MemberAbcView", [
+//                [dir: "${tempSrcJavaDir}", includes: ["**/*.java"]]
+//        ])
+//    }
+//
+//    void dbbb(){
+//        copyPomXml("$targetDir/pom.xml", "$targetDir/pom123.xml",
+//                ["artifactId": "abc", "parent/version":"1.2.3"],
+//                ["abc:cde:1", "mmm:ddd:new1"]
+//        )
+//    }
+//
+//    void ddd(){
+//        "$subProjectDir/pom.xml".toFile().delete()
+//        postProcess()
+//        addPomModule("$subProjectDir/pom.xml", "abc")
+//        addPomModule("$subProjectDir/pom.xml", "abc")
+//        addPomModule("$subProjectDir/pom.xml", "abc-123")
+//        addPomModule("$subProjectDir/pom.xml", "abc-123")
+//        addPomModule("$subProjectDir/pom.xml", "abc123")
+//        println("$subProjectDir/pom.xml".toFile().text)
+//    }
 }
 
 //def ag = new AnalysisGenerator("/Users/jiangjianbo/work/tech/powergen/powergen-test", "vo", "view")
@@ -1999,6 +2005,17 @@ service * with serviceImpl
     void postProcess(){
         super.postProcess()
 
+        // 复制 liqubase 用于描述 实体 的配置文件
+        ant.copy(todir: "${subProjectDir}/${artifactId.dashCase()}-domain/src/main/resources/config/liquibase/"){
+            ant.fileset(dir:"$targetDir/src/main/resources/config/liquibase/"){
+                ant.include(name: "changelog/*.xml")
+                ant.exclude(name: "changelog/000000*.xml")
+            }
+        }
+
+        ant.copy(file:"$targetDir/src/main/resources/config/liquibase/master.xml",
+                tofile: "${subProjectDir}/${artifactId.dashCase()}-domain/src/main/resources/config/liquibase/${artifactId.dashCase()}-master.xml")
+
         // 创建 domain pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-domain/pom.xml",
                 [
@@ -2204,6 +2221,25 @@ service * with serviceImpl
         ], [
                 "${projectGroupId}:${artifactId.dashCase()}-domain:$version"
         ])
+
+        // 创建 Repository 的自动注册扫描文件
+        def upperArtifactId = artifactId.camelCase().replaceAll("Plugin", "").upperFirst()
+        System.out.println("artifact name = ${upperArtifactId}")
+        def dbconf = new File("${subProjectDir}/${artifactId.dashCase()}-repository-impl/src/main/java/${groupId.packageToPath()}/${upperArtifactId}DatabaseConfiguration.java")
+        if( dbconf.exists() == false ) {
+            dbconf.withPrintWriter {
+                it.println("""
+        package ${groupId};
+
+        @org.springframework.context.annotation.Configuration
+        @org.springframework.data.jpa.repository.config.EnableJpaRepositories("${groupId}")
+        @org.springframework.data.jpa.repository.config.EnableJpaAuditing(auditorAwareRef = "springSecurityAuditorAware")
+        @org.springframework.transaction.annotation.EnableTransactionManagement
+        public class ${upperArtifactId}DatabaseConfiguration {
+        }
+        """)
+            }
+        }
 
         // 添加 repository impl pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-repository-impl/pom.xml", [
