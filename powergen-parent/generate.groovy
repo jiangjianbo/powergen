@@ -196,9 +196,45 @@ String.metaClass.isDirectory = {
 // assert false == "/etc/passwd".isDirectory()
 // assert false == "/ab0012343".isDirectory()
 
+/**
+ * 将字符串修改为路径格式，并去掉末尾的路径分隔符
+ */
+String.metaClass.path = {
+    String str = delegate.trim().replaceAll(/[\\\/]+/, "/")
+    str.replaceFirst(/([\w\d\-]+)\/$/){ it[0].left(-1)   }
+}
+
+// assert "/" == "/".path()
+// assert "/a" == "/a".path()
+// assert "/a" == "/a/".path()
+// assert "a" == "a".path()
+// assert "a" == "a/".path()
+// assert "/a/1" == "/a/1".path()
+// assert "a/1" == "a/1".path()
+// assert "a" == "a////".path()
+// assert "a/b/c/d" == "a\\b\\c/d\\".path()
+
+/**
+ * 将字符串修改为 windows 路径格式，并去掉末尾的路径分隔符
+ */
+String.metaClass.winpath = {
+    String str = delegate.path()
+    str.replaceAll(/\//, '\\\\')
+}
+
+// assert "\\" == "/".winpath()
+// assert "\\a" == "/a".winpath()
+// assert "\\a" == "/a/".winpath()
+// assert "a" == "a".winpath()
+// assert "a" == "a/".winpath()
+// assert "\\a\\1" == "/a/1".winpath()
+// assert "a\\1" == "a/1".winpath()
+// assert "a" == "a////".winpath()
+// assert "a\\b\\c\\d" == "a\\b\\c/d\\".winpath()
+
 String.metaClass.canonicalPath = {
     def file = new File(delegate)
-    return file.exists() ? file.canonicalPath : delegate
+    return (file.exists() ? file.canonicalPath : delegate).path()
 }
 
 // assert "/" == "/".canonicalPath()
@@ -453,42 +489,6 @@ String.metaClass.toRegexp = {
 // assert "\\(a\\)" == /(a)/.toRegexp()
 // assert "\\(" == /(/.toRegexp()
 // assert "\\/" == "/".toRegexp()
-
-/**
- * 将字符串修改为路径格式，并去掉末尾的路径分隔符
- */
-String.metaClass.path = {
-    String str = delegate.trim().replaceAll(/[\\\/]+/, "/")
-    str.replaceFirst(/([\w\d\-]+)\/$/){ it[0].left(-1)   }
-}
-
-// assert "/" == "/".path()
-// assert "/a" == "/a".path()
-// assert "/a" == "/a/".path()
-// assert "a" == "a".path()
-// assert "a" == "a/".path()
-// assert "/a/1" == "/a/1".path()
-// assert "a/1" == "a/1".path()
-// assert "a" == "a////".path()
-// assert "a/b/c/d" == "a\\b\\c/d\\".path()
-
-/**
- * 将字符串修改为 windows 路径格式，并去掉末尾的路径分隔符
- */
-String.metaClass.winpath = {
-    String str = delegate.path()
-    str.replaceAll(/\//, '\\\\')
-}
-
-// assert "\\" == "/".winpath()
-// assert "\\a" == "/a".winpath()
-// assert "\\a" == "/a/".winpath()
-// assert "a" == "a".winpath()
-// assert "a" == "a/".winpath()
-// assert "\\a\\1" == "/a/1".winpath()
-// assert "a\\1" == "a/1".winpath()
-// assert "a" == "a////".winpath()
-// assert "a\\b\\c\\d" == "a\\b\\c/d\\".winpath()
 
 String.metaClass.relativePath = { String rootPath ->
     if( delegate.startsWith(rootPath) ) {
