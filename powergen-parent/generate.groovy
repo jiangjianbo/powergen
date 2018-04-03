@@ -762,12 +762,12 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
 
         if( System.getProperty("os.name").toLowerCase().indexOf("windows") >= 0 ) {
             shellscript(shell: "cmd.exe", arg: " /c call ", tmpsuffix: ".bat", dir: "${targetDir}", osfamily: "windows", failonerror: "true", """
-                yo jhipster --force
+                call yo jhipster --force
                 if "%errorlevel%" == "0" (
                     if not exist "${targetDir.winpath()}\\src" echo "======src not generated======" && exit 1
                     if exist "fix-${jdlName}" (
                         echo ================generate from ${jdlName}======================
-                        yo jhipster:import-jdl fix-${jdlName} --force
+                        call yo jhipster:import-jdl fix-${jdlName} --force
                     )
                 ) else (
                     echo "======src not generated======" && exit 1
