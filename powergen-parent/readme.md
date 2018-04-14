@@ -12,7 +12,40 @@
 每一个模块工程都是带界面和后台代码的独立部分，一般包含多个project，
 能够适应微服务方式的部署。
 
+## 控制参数
+
+控制参数是在 pom 文件中加入的一些参数，用来输入外部的一些参数。这些控制参数都是在 pom 文件中 
+properties 节点下的属性定义：
+
+* frameworkPackage
+使用 framework 的 package 包名。会影响到 framework 工程的 package。
+* frameworkName
+框架的名称，会影响到 framework-web 工程里 angularjs 框架使用的 工程名。
+* parentGroupId
+所有生成的 pom.xml 文件的 parent pom的 groupId
+* parentArtifactId
+所有生成的 pom.xml 文件的 parent pom的 artifactId
+* parentVersion
+所有生成的 pom.xml 文件的 parent pom的 version
+
+默认的控制参数定义配置如下：
+
+	<properties>
+		<frameworkPackage>com.github.powergen.framework</frameworkPackage>
+		<frameworkName>jHipsterFramework</frameworkName>
+
+        <parentGroupId>org.springframework.boot</parentGroupId>
+        <parentArtifactId>spring-boot-starter-parent</parentArtifactId>
+        <parentVersion>1.5.3.RELEASE</parentVersion>
+	</properties>
+
+
 ## 控制标签
+
+控制标签是在 jdl 文件中，每一个 entity 和 property 定义之前的 `/**  */` 块注释内部添加的控制信息。
+用于控制生成器的一些行为，增强代码生成的描述能力。
+
+每一个控制标签必须在块注释中占用单独的一行。
 
 * pg-extends: XXX, pg-implements: XXX
 

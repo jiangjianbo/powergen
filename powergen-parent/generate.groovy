@@ -568,15 +568,15 @@ class Generator{
 
         checkProperties()
 
-        assert !"${artifactId}".isEmpty()
-        assert !"${groupId}".isEmpty()
+        assert !"$artifactId".isEmpty()
+        assert !"$groupId".isEmpty()
 
         checkOptions()
 
         println("""
 processing ${layer}[${layerNs}] @ ${this.baseDir}
-    groupId: ${groupId}
-    artifactId: ${artifactId}
+    groupId: $groupId
+    artifactId: $artifactId
         """)
     }
 
@@ -607,7 +607,7 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
 
     def getSrcJavaDir(){ "${baseDir}/src/main/java" }
     def getSrcModelDir(){ "${baseDir}/src/main/model" }
-    def getJdlName() { "${artifactId}.${layer}.jdl" }
+    def getJdlName() { "${this.artifactId}.${layer}.jdl" }
     def getProjectTargetDir() { "${baseDir}/target" }
     def getTargetDir() { "${projectTargetDir}/${layer}" }
     def getTargetSrcDir() { "${targetDir}/src" }
@@ -705,12 +705,12 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
         {
             "generator-jhipster": {
                 "promptValues": {
-                    "packageName": "${groupId}",
+                    "packageName": "${this.groupId}",
                     "nativeLanguage": "en"
                 },
                 "jhipsterVersion": "4.5.2",
                 "baseName": "$artifactId",
-                "packageName": "${groupId}",
+                "packageName": "${this.groupId}",
                 "packageFolder": "$packageDir",
                 "serverPort": "8080",
                 "authenticationType": "session",
@@ -923,16 +923,18 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
     }
 
     void link(String srcDir, String linkDir){
-        def parent = linkDir.toFile().parent
-        def name = linkDir.toFile().name
+        println "link $srcDir ==> $linkDir"
+
+        def parentDir = linkDir.toFile().parent
+        def dirname = linkDir.toFile().name
 
         if( System.getProperty("os.name").toLowerCase().indexOf("windows") >= 0 ) {
-            shellscript(shell: "cmd.exe", arg: "/c call ", tmpsuffix: ".bat", dir: "${parent}", osfamily: "windows", failonerror: "true", """
-                mklink /j ${name} "${srcDir.winpath()}"
+            shellscript(shell: "cmd.exe", arg: "/c call ", tmpsuffix: ".bat", dir: "${parentDir}", osfamily: "windows", failonerror: "true", """
+                mklink /j ${dirname} "${srcDir.winpath()}"
             """)
         }else {
-            shellscript(shell:"bash", dir: "${parent}", osfamily:"unix", failonerror:"true", """
-                ln -s ${srcDir.path()} ${name}
+            shellscript(shell:"bash", dir: "${parentDir}", osfamily:"unix", failonerror:"true", """
+                ln -s ${srcDir.path()} ${dirname}
                 """)
         }
     }
@@ -1098,7 +1100,7 @@ class AnalysisGenerator extends Generator{
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>${projectGroupId}</groupId>
-    <artifactId>${artifactId}-build</artifactId>
+    <artifactId>${this.artifactId}-build</artifactId>
     <packaging>pom</packaging>
     <version>$version</version>
 
@@ -1663,18 +1665,18 @@ service * with serviceImpl
         def subdir1 = "${subProjectDir}/framework-util/src/main/java/"
         def utilMaps = [
                 [dir: "$tempSrcJavaDir", includes: [
-                        "${groupId}.service.mapper.EntityMapper".packageToPath() + ".java",
-                        "${groupId}.web.rest.util.HeaderUtil".packageToPath() + ".java",
-                        "${groupId}.web.rest.util.PaginationUtil".packageToPath() + ".java"
+                        "${this.groupId}.service.mapper.EntityMapper".packageToPath() + ".java",
+                        "${this.groupId}.web.rest.util.HeaderUtil".packageToPath() + ".java",
+                        "${this.groupId}.web.rest.util.PaginationUtil".packageToPath() + ".java"
                 ]]
         ]
         copyAndReplaceFiles(subdir1, utilMaps)
         ant.delete(){
             filesetsToClosure(utilMaps)()
         }
-        assert ("$tempSrcJavaDir/${groupId}.service.mapper.EntityMapper".packageToPath() + ".java").isFile() == false
-        assert ("$tempSrcJavaDir/${groupId}.web.rest.util.HeaderUtil".packageToPath() + ".java").isFile() == false
-        assert ("$tempSrcJavaDir/${groupId}.web.rest.util.PaginationUtil".packageToPath() + ".java").isFile() == false
+        assert ("$tempSrcJavaDir/${this.groupId}.service.mapper.EntityMapper".packageToPath() + ".java").isFile() == false
+        assert ("$tempSrcJavaDir/${this.groupId}.web.rest.util.HeaderUtil".packageToPath() + ".java").isFile() == false
+        assert ("$tempSrcJavaDir/${this.groupId}.web.rest.util.PaginationUtil".packageToPath() + ".java").isFile() == false
 
         copyAndReplaceFiles("${subProjectDir}/framework/src",
                 [
@@ -1746,8 +1748,8 @@ service * with serviceImpl
 
                         "properties/maven.version" : "3.0.0",
                         "properties/java.version" : "1.8",
-                        "properties/maven.compiler.source" : "\${java.version}",
-                        "properties/maven.compiler.target" : "\${java.version}",
+                        "properties/maven.compiler.source" : "\$"+"{java.version}",
+                        "properties/maven.compiler.target" : "\$"+"{java.version}",
 
                         "properties/project.build.sourceEncoding" : "UTF-8",
 
@@ -1890,19 +1892,19 @@ dto * with mapstruct
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/repository/${entityName}Repository.java".isFile()
         
         replaceClass("$tempSrcJavaDir", [
-                [from: "${groupId}.service.mapper.EntityMapper", to: "${frameworkGroupId}.service.mapper.EntityMapper"],
-                [from: "${groupId}.web.rest.util.HeaderUtil", to: "${frameworkGroupId}.web.rest.util.HeaderUtil"],
-                [from: "${groupId}.web.rest.util.PaginationUtil", to: "${frameworkGroupId}.web.rest.util.PaginationUtil"],
+                [from: "${this.groupId}.service.mapper.EntityMapper", to: "${frameworkGroupId}.service.mapper.EntityMapper"],
+                [from: "${this.groupId}.web.rest.util.HeaderUtil", to: "${frameworkGroupId}.web.rest.util.HeaderUtil"],
+                [from: "${this.groupId}.web.rest.util.PaginationUtil", to: "${frameworkGroupId}.web.rest.util.PaginationUtil"],
                 // 移动 DTO 的命名空间
-                [ from: "${groupId}.service.dto.${entityName}DTO", to: "${groupId}.dto.${entityName}DTO"] ,
+                [ from: "${this.groupId}.service.dto.${entityName}DTO", to: "${this.groupId}.dto.${entityName}DTO"] ,
                 // 移动 Resource 的命名空间
-                [ from:"${groupId}.web.rest.${entityName}Resource", to:"${groupId}.rest.${entityName}Resource"] ,
+                [ from:"${this.groupId}.web.rest.${entityName}Resource", to:"${this.groupId}.rest.${entityName}Resource"] ,
                 // 移动 Mapper 的命名空间
-                [ from: "${groupId}.service.mapper.${entityName}Mapper", to:"${groupId}.mapper.${entityName}Mapper"] ,
+                [ from: "${this.groupId}.service.mapper.${entityName}Mapper", to:"${this.groupId}.mapper.${entityName}Mapper"] ,
                 // 将 domain 改造成 BO DTO
-                [ from: "${groupId}.domain.${entityName}", to:"${projectGroupId}.application.service.dto.${boName}DTO"] ,
+                [ from: "${this.groupId}.domain.${entityName}", to:"${projectGroupId}.application.service.dto.${boName}DTO"] ,
                 // 将 repository 改造成 BO Service
-                [ from: "${groupId}.repository.${entityName}Repository", to:"${projectGroupId}.application.service.${boName}Service"]
+                [ from: "${this.groupId}.repository.${entityName}Repository", to:"${projectGroupId}.application.service.${boName}Service"]
         ], files){
             replaceText(/\s+extends\s+EntityMapper\b/, " extends ${frameworkGroupId}.service.mapper.EntityMapper".toRegexp(), "gm", files)
             replaceText(/import\s+${groupId.toRegexp()}\.domain\.\*\s*;/, /import ${projectGroupId.toRegexp()}\.application\.service\.dto\.\*;/, "gm", files)
@@ -1918,9 +1920,9 @@ dto * with mapstruct
         def subdir1 = "${subProjectDir}/${artifactId.dashCase()}-web/src/main/java/"
         copyAndReplaceFiles(subdir1, [
                 [dir: "$tempSrcJavaDir", includes: [
-                        "${groupId}.dto.${entityName}DTO".packageToPath() + ".java",
-                        "${groupId}.rest.${entityName}Resource".packageToPath() + ".java",
-                        "${groupId}.mapper.${entityName}Mapper".packageToPath() + ".java"
+                        "${this.groupId}.dto.${entityName}DTO".packageToPath() + ".java",
+                        "${this.groupId}.rest.${entityName}Resource".packageToPath() + ".java",
+                        "${this.groupId}.mapper.${entityName}Mapper".packageToPath() + ".java"
                 ]]
         ])
 
@@ -1928,7 +1930,7 @@ dto * with mapstruct
         assert "$subdir1/${groupId.packageToPath()}/rest/${entityName}Resource.java".isFile()
         assert "$subdir1/${groupId.packageToPath()}/mapper/${entityName}Mapper.java".isFile()
 
-        assert !("$subdir1/${groupId.packageToPath()}/rest/${entityName}Resource.java".toFile().text ==~ "${groupId}.repository.${entityName}Repository".toRegexp())
+        assert !("$subdir1/${groupId.packageToPath()}/rest/${entityName}Resource.java".toFile().text ==~ "${this.groupId}.repository.${entityName}Repository".toRegexp())
 
     }
 
@@ -1958,18 +1960,18 @@ dto * with mapstruct
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-web/pom.xml",
                 [
                         "parent/groupId" : "$projectGroupId",
-                        "parent/artifactId" : "${artifactId}-parent",
+                        "parent/artifactId" : "${this.artifactId}-parent",
                         "parent/version" : "$version",
-                        "parent/relativePath" : "../${artifactId}-parent",
+                        "parent/relativePath" : "../${this.artifactId}-parent",
 
                         "groupId": "$projectGroupId",
                         "artifactId": "${artifactId.dashCase()}-web",
                         "packaging": "jar",
                         "name": "$artifactId web project"
                 ], [
-                        "org.mapstruct:mapstruct-jdk8:\${mapstruct.version}",
-                        "io.github.jhipster:jhipster:\${jhipster.server.version}",
-                        "io.dropwizard.metrics:metrics-annotation:\${dropwizard-metrics.version}",
+                        "org.mapstruct:mapstruct-jdk8:\$"+"{mapstruct.version}",
+                        "io.github.jhipster:jhipster:\$"+"{jhipster.server.version}",
+                        "io.dropwizard.metrics:metrics-annotation:\$"+"{dropwizard-metrics.version}",
                         "${frameworkGroupId}:framework-util:$version", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-application-service:$version"// 依赖 BO Service
                 ]
@@ -2049,9 +2051,9 @@ service * with serviceImpl
         // 将 repository 改造成 po 的 repository
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/repository/${entityName}Repository.java".isFile()
         replaceClass("$tempSrcJavaDir", [
-                [from: "${groupId}.service.mapper.EntityMapper", to: "${frameworkGroupId}.service.mapper.EntityMapper"],
-                [ from:"${groupId}.domain.AbstractAuditingEntity", to: "${projectGroupId}.application.domain.AbstractAuditingEntity"],
-                [ from:"${groupId}.repository.${entityName}Repository", to: "${projectGroupId}.repository.${entityName}Repository"]
+                [from: "${this.groupId}.service.mapper.EntityMapper", to: "${frameworkGroupId}.service.mapper.EntityMapper"],
+                [ from:"${this.groupId}.domain.AbstractAuditingEntity", to: "${projectGroupId}.application.domain.AbstractAuditingEntity"],
+                [ from:"${this.groupId}.repository.${entityName}Repository", to: "${projectGroupId}.repository.${entityName}Repository"]
         ], files){
             replaceText(/\s+extends\s+EntityMapper\b/, " extends ${frameworkGroupId}.service.mapper.EntityMapper".toRegexp(), "gm", files)
         }
@@ -2061,7 +2063,7 @@ service * with serviceImpl
         // 清除 domain 的所有 jpa 标记
         def domainFiles = [
                 [dir: "$tempSrcJavaDir", includes: [
-                        "${groupId}.domain.${entityName}".packageToPath() + ".java"
+                        "${this.groupId}.domain.${entityName}".packageToPath() + ".java"
                 ]]
         ]
         replaceText(/(^\s*@[^O].+[\r\n]+)+^(\s*((public)|(private)))/, "\\2", "gm", domainFiles)
@@ -2076,8 +2078,8 @@ service * with serviceImpl
         def serviceDir = "${subProjectDir}/${artifactId.dashCase()}-application-service/src/main/java/"
         copyAndReplaceFiles(serviceDir, [
                 [dir: "$tempSrcJavaDir", includes: [
-                        "${groupId}.service.${entityName}Service".packageToPath() + ".java",
-                        "${groupId}.service.dto.${entityName}DTO".packageToPath() + ".java"
+                        "${this.groupId}.service.${entityName}Service".packageToPath() + ".java",
+                        "${this.groupId}.service.dto.${entityName}DTO".packageToPath() + ".java"
                 ]]
         ])
         assert "$serviceDir/${groupId.packageToPath()}/service/${entityName}Service.java".isFile()
@@ -2087,8 +2089,8 @@ service * with serviceImpl
         def implDir = "${subProjectDir}/${artifactId.dashCase()}-application-service-impl/src/main/java/"
         copyAndReplaceFiles(implDir, [
                 [dir: "$tempSrcJavaDir", includes: [
-                        "${groupId}.service.impl.${entityName}ServiceImpl".packageToPath() + ".java",
-                        "${groupId}.service.mapper.${entityName}Mapper".packageToPath() + ".java"
+                        "${this.groupId}.service.impl.${entityName}ServiceImpl".packageToPath() + ".java",
+                        "${this.groupId}.service.mapper.${entityName}Mapper".packageToPath() + ".java"
                 ]]
         ])
         assert "$implDir/${groupId.packageToPath()}/service/impl/${entityName}ServiceImpl.java".isFile()
@@ -2113,18 +2115,18 @@ service * with serviceImpl
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-domain/pom.xml",
                 [
                         "parent/groupId" : "$projectGroupId",
-                        "parent/artifactId" : "${artifactId}-parent",
+                        "parent/artifactId" : "${this.artifactId}-parent",
                         "parent/version" : "$version",
-                        "parent/relativePath" : "../${artifactId}-parent",
+                        "parent/relativePath" : "../${this.artifactId}-parent",
 
                         "groupId": "$projectGroupId",
                         "artifactId": "${artifactId.dashCase()}-domain",
                         "packaging": "jar",
                         "name": "$artifactId domain project"
                 ], [
-                        "io.swagger:swagger-annotations:\${swagger-annotations.version}",
-                        "org.webjars:webjars-locator:\${webjars-locator.version}",
-                        "org.kohsuke.metainf-services:metainf-services:\${metainf-services.version}",
+                        "io.swagger:swagger-annotations:\$"+"{swagger-annotations.version}",
+                        "org.webjars:webjars-locator:\$"+"{webjars-locator.version}",
+                        "org.kohsuke.metainf-services:metainf-services:\$"+"{metainf-services.version}",
                         "${frameworkGroupId}:framework-util:$version"// 依赖 framework-util
                 ]
         ){ pom ->
@@ -2138,9 +2140,9 @@ service * with serviceImpl
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-application-service/pom.xml",
                 [
                         "parent/groupId" : "$projectGroupId",
-                        "parent/artifactId" : "${artifactId}-parent",
+                        "parent/artifactId" : "${this.artifactId}-parent",
                         "parent/version" : "$version",
-                        "parent/relativePath" : "../${artifactId}-parent",
+                        "parent/relativePath" : "../${this.artifactId}-parent",
 
                         "groupId": "$projectGroupId",
                         "artifactId": "${artifactId.dashCase()}-application-service",
@@ -2161,18 +2163,18 @@ service * with serviceImpl
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-application-service-impl/pom.xml",
                 [
                         "parent/groupId" : "$projectGroupId",
-                        "parent/artifactId" : "${artifactId}-parent",
+                        "parent/artifactId" : "${this.artifactId}-parent",
                         "parent/version" : "$version",
-                        "parent/relativePath" : "../${artifactId}-parent",
+                        "parent/relativePath" : "../${this.artifactId}-parent",
 
                         "groupId": "$projectGroupId",
                         "artifactId": "${artifactId.dashCase()}-application-service-impl",
                         "packaging": "jar",
                         "name": "$artifactId application service implement project"
                 ], [
-                        "org.mapstruct:mapstruct-jdk8:\${mapstruct.version}",
-                        "io.github.jhipster:jhipster:\${jhipster.server.version}",
-                        "io.dropwizard.metrics:metrics-annotation:\${dropwizard-metrics.version}",
+                        "org.mapstruct:mapstruct-jdk8:\$"+"{mapstruct.version}",
+                        "io.github.jhipster:jhipster:\$"+"{jhipster.server.version}",
+                        "io.dropwizard.metrics:metrics-annotation:\$"+"{dropwizard-metrics.version}",
                         "${frameworkGroupId}:framework-util:$version", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-domain:$version", // domain
                         "$projectGroupId:${artifactId.dashCase()}-application-service:$version", // 依赖 BO Service
@@ -2267,23 +2269,23 @@ service * with serviceImpl
 
         def classMaps = [
                 // 移动 repository 到 新的 package
-                [ from: "${groupId}.repository.${entityName}Repository", to:"${groupId}.access.${entityName}Access"],
+                [ from: "${this.groupId}.repository.${entityName}Repository", to:"${this.groupId}.access.${entityName}Access"],
 
                 // 移动 repository 的 domain 到 新的 package，作为 PO
-                [ from:  "${groupId}.domain.${entityName}", to:"${groupId}.po.${entityName}"]
+                [ from:  "${this.groupId}.domain.${entityName}", to:"${this.groupId}.po.${entityName}"]
         ]
 
         if( boName != null ) {
             classMaps += [
-                    [from: "${groupId}.service.mapper.EntityMapper", to: "${frameworkGroupId}.service.mapper.EntityMapper"],
+                    [from: "${this.groupId}.service.mapper.EntityMapper", to: "${frameworkGroupId}.service.mapper.EntityMapper"],
                     // 将 PO DTO 修改为 application 的 BO Domain
-                    [ from:  "${groupId}.service.dto.${entityName}DTO", to:"${projectGroupId}.application.domain.${boName}"],
+                    [ from:  "${this.groupId}.service.dto.${entityName}DTO", to:"${projectGroupId}.application.domain.${boName}"],
                     // 将 PO service 修改为 repository
-                    [ from:  "${groupId}.service.${entityName}Service", to:"${groupId}.${boName}Repository"],
+                    [ from:  "${this.groupId}.service.${entityName}Service", to:"${this.groupId}.${boName}Repository"],
                     // 将 PO service impl 修改为 repository impl
-                    [ from: "${groupId}.service.impl.${entityName}ServiceImpl",to: "${groupId}.impl.${boName}RepositoryImpl"],
+                    [ from: "${this.groupId}.service.impl.${entityName}ServiceImpl",to: "${this.groupId}.impl.${boName}RepositoryImpl"],
                     // 移动 Mapper 的命名空间
-                    [ from:  "${groupId}.service.mapper.${entityName}Mapper", to:"${groupId}.mapper.${entityName}Mapper"]
+                    [ from:  "${this.groupId}.service.mapper.${entityName}Mapper", to:"${this.groupId}.mapper.${entityName}Mapper"]
             ]
         }
 
@@ -2305,7 +2307,7 @@ service * with serviceImpl
             def repoDir = "${subProjectDir}/${artifactId.dashCase()}-repository/src/main/java/"
             copyAndReplaceFiles(repoDir, [
                     [dir: "$tempSrcJavaDir", includes: [
-                            "${groupId}.${boName}Repository".packageToPath() + ".java"
+                            "${this.groupId}.${boName}Repository".packageToPath() + ".java"
                     ]]
             ])
             assert "$repoDir/${groupId.packageToPath()}/${boName}Repository.java".isFile()
@@ -2314,8 +2316,8 @@ service * with serviceImpl
             def repoImplDir = "${subProjectDir}/${artifactId.dashCase()}-repository-impl/src/main/java/"
             copyAndReplaceFiles(repoImplDir, [
                     [dir: "$tempSrcJavaDir", includes: [
-                            "${groupId}.impl.${boName}RepositoryImpl".packageToPath() + ".java",
-                            "${groupId}.mapper.${entityName}Mapper".packageToPath() + ".java"
+                            "${this.groupId}.impl.${boName}RepositoryImpl".packageToPath() + ".java",
+                            "${this.groupId}.mapper.${entityName}Mapper".packageToPath() + ".java"
                     ]]
             ])
 
@@ -2327,8 +2329,8 @@ service * with serviceImpl
         def subdir1 = "${subProjectDir}/${artifactId.dashCase()}-repository-impl/src/main/java/"
         copyAndReplaceFiles(subdir1, [
                 [dir: "$tempSrcJavaDir", includes: [
-                        "${groupId}.po.${entityName}".packageToPath() + ".java",
-                        "${groupId}.access.${entityName}Access".packageToPath() + ".java"
+                        "${this.groupId}.po.${entityName}".packageToPath() + ".java",
+                        "${this.groupId}.access.${entityName}Access".packageToPath() + ".java"
                 ]]
         ])
 
@@ -2344,9 +2346,9 @@ service * with serviceImpl
         // 添加 repository pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-repository/pom.xml", [
                 "parent/groupId" : "$projectGroupId",
-                "parent/artifactId" : "${artifactId}-parent",
+                "parent/artifactId" : "${this.artifactId}-parent",
                 "parent/version" : "$version",
-                "parent/relativePath" : "../${artifactId}-parent",
+                "parent/relativePath" : "../${this.artifactId}-parent",
 
                 "groupId": "$projectGroupId",
                 "artifactId": "${artifactId.dashCase()}-repository",
@@ -2368,10 +2370,10 @@ service * with serviceImpl
         if( dbconf.exists() == false ) {
             dbconf.withPrintWriter {
                 it.println("""
-        package ${groupId};
+        package ${this.groupId};
 
         @org.springframework.context.annotation.Configuration
-        @org.springframework.data.jpa.repository.config.EnableJpaRepositories("${groupId}")
+        @org.springframework.data.jpa.repository.config.EnableJpaRepositories("${this.groupId}")
         @org.springframework.data.jpa.repository.config.EnableJpaAuditing(auditorAwareRef = "springSecurityAuditorAware")
         @org.springframework.transaction.annotation.EnableTransactionManagement
         public class ${upperArtifactId}DatabaseConfiguration {
@@ -2383,16 +2385,16 @@ service * with serviceImpl
         // 添加 repository impl pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-repository-impl/pom.xml", [
                 "parent/groupId" : "$projectGroupId",
-                "parent/artifactId" : "${artifactId}-parent",
+                "parent/artifactId" : "${this.artifactId}-parent",
                 "parent/version" : "$version",
-                "parent/relativePath" : "../${artifactId}-parent",
+                "parent/relativePath" : "../${this.artifactId}-parent",
 
                 "groupId": "$projectGroupId",
                 "artifactId": "${artifactId.dashCase()}-repository-impl",
                 "packaging": "jar",
                 "name": "$artifactId repository implement project"
         ], [
-                "org.mapstruct:mapstruct-jdk8:\${mapstruct.version}",
+                "org.mapstruct:mapstruct-jdk8:\$"+"{mapstruct.version}",
                 "${projectGroupId}:${artifactId.dashCase()}-domain:$version",
                 "$projectGroupId:${artifactId.dashCase()}-repository:$version"
         ]){ pom ->
@@ -2414,14 +2416,14 @@ service * with serviceImpl
 //String frameworkPackage="cn.gyxr.saas"
 //String frameworkName="gyxrframe"
 //String homeDir="/Users/jiangjianbo/work/tech/powergen/powergen-test"
-String homeDir="/Users/jiangjianbo/work/tech/powergen/adam2-demo"
-
-frameworkPackage="cn.gyxr.saas.frame"
-frameworkName="EdenFramework"
-
-parentGroupId="org.springframework.boot"
-parentArtifactId="spring-boot-starter-parent"
-parentVersion="1.5.3.RELEASE"
+//String homeDir="/Users/jiangjianbo/work/tech/powergen/adam2-demo"
+//
+//frameworkPackage="cn.gyxr.saas.frame"
+//frameworkName="EdenFramework"
+//
+//parentGroupId="org.springframework.boot"
+//parentArtifactId="spring-boot-starter-parent"
+//parentVersion="1.5.3.RELEASE"
 
 Generator.frameworkGroupId = frameworkPackage
 Generator.frameworkArtifactId = frameworkName
