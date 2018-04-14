@@ -1,5 +1,6 @@
 import groovy.transform.stc.ClosureParams
 import groovy.transform.stc.SimpleType
+import groovy.xml.QName
 import groovy.xml.XmlUtil
 
 import java.util.regex.Pattern
@@ -544,6 +545,7 @@ class Generator{
     static AntBuilder ant = new AntBuilder()
     static String frameworkArtifactId
     static String frameworkGroupId
+    static String parentGroupId, parentArtifactId, parentVersion
 
     /**
      * 存放命令行的参数
@@ -838,8 +840,8 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
     /**
      *
      * @param todir
-     * @param filesets closure OR array of map {dir:""; includes:[""]; excludes:[""]}
-     * @param replaces array of map {match:""; replace:""; flags:""}
+     * @param filesets closure OR array of map {dir:"", includes:[""], excludes:[""]}
+     * @param replaces array of map {match:"", replace:"", flags:""}
      */
     void copyAndReplaceFiles(String todir, def filesets, def replaces = null) {
         def fsets = filesetsToClosure(filesets)
@@ -1148,6 +1150,7 @@ class AnalysisGenerator extends Generator{
             String fromClass = classMap.from
             String toClass = classMap.to
 
+            System.out.println("replace Class from $fromClass to $toClass")
             if (fromClass == toClass) return
 
             // 将 class 改名，同时修改 class 的引用 和 文件名
@@ -1163,6 +1166,7 @@ class AnalysisGenerator extends Generator{
             // 如果 package 不相等
             if (fromClassPkg != toClassPkg) {
                 // 再替换 package xxxx; 的声明
+                System.out.println("replace package from $fromClassPkg to $toClassPkg")
                 replaceText(/^\s*package ${fromClassPkg.toRegexp()}\s*;/, /package ${toClassPkg.toRegexp()};/, "gm",
                         cloneFilesetMapArray(files) {
                             it.endsWith("/${fromClassName}.java")
@@ -1227,20 +1231,27 @@ class AnalysisGenerator extends Generator{
 
         def pom = new XmlParser().parse(toPom)
 
+        if( callback != null && callback instanceof Closure) callback(pom)
+
         if( nodes != null ) nodes.each{ key, val ->
             def curnode = pom
-            key.split(/[\.\/]/).each{  if( it.length() > 0 ) curnode = curnode."$it"[0] }
+            key.split(/[\/]/).each{
+                if( it.length() > 0 ) {
+                    curnode = createOrGetChild(curnode, it)
+                    // groovy.util.Node 530 行， GStringImpl 和 String 比较有问题
+                    // curnode = curnode."$it".size() > 0 ? curnode."$it"[0] : curnode.appendNode("$it")
+                }
+            }
 
             curnode.value = val
         }
-
-        if( callback != null && callback instanceof Closure) callback(pom)
 
         if( dependencies != null ) dependencies.each{
             def arr = it.split(/\s*:\s*/)
             def grp = arr.size() > 0 ? arr[0]: null
             def art = arr.size() > 1 ? arr[1]: null
             def ver = arr.size() > 2 ? arr[2]: null
+            def scope = arr.size() > 3 ? arr[3]: null
 
             if( !(grp == null && art == null && ver == null) ){
                 def node = pom.dependencies[0]
@@ -1249,11 +1260,32 @@ class AnalysisGenerator extends Generator{
                 if( grp != null ) dep.appendNode("groupId", grp)
                 if( art != null ) dep.appendNode("artifactId", art)
                 if( ver != null ) dep.appendNode("version", ver)
+                if( scope != null ) dep.appendNode("scope", scope)
             }
         }
 
         if( dependencies != null && nodes != null && (nodes.size() > 0 || dependencies.size() > 0) ) {
             XmlUtil.serialize(pom, toPom.toFile().newWriter("utf-8"))
+        }
+    }
+
+    def createOrGetChild(def curnode, String it){
+        if( curnode."$it".size() > 0 ){
+            return curnode."$it"[0]
+        }else{
+            def retnode = curnode.children().find {childNode ->
+                Object childNodeName = childNode.name();
+                if (childNodeName instanceof QName) {
+                    QName qn = (QName) childNodeName;
+                    if (qn.matches(it)) {
+                        return true;
+                    }
+                } else if (it.equals(childNodeName.toString())) {
+                    return true;
+                }
+                return false;
+            }
+            return retnode ?: curnode.appendNode("$it")
         }
     }
 
@@ -1588,8 +1620,13 @@ class AnalysisWithActionGenerator extends AnalysisGenerator{
 // 负责从代码中提取基础的框架代码，并将其插件化
 class FrameworkGenerator extends AnalysisWithActionGenerator{
 
+    String savedGroupId, savedArtifactId
+
     public FrameworkGenerator(String baseDir){
         super(baseDir, "framework")
+
+        savedGroupId = this.groupId
+        savedArtifactId = this.artifactId
 
         this.groupId = frameworkGroupId
         this.artifactId = frameworkArtifactId
@@ -1691,6 +1728,46 @@ service * with serviceImpl
 
         if( ! "${subProjectDir}/framework/node_modules".isDirectory() ){
             link("$baseDir/node_modules", "${subProjectDir}/framework/node_modules")
+        }
+
+        // 创建 parent pom 文件
+        copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${savedArtifactId}-parent/pom.xml",
+                [
+                        "parent/groupId" : "$parentGroupId",
+                        "parent/artifactId" : "$parentArtifactId",
+                        "parent/version" : "$parentVersion",
+
+                        "groupId": "$projectGroupId",
+                        "artifactId": "${savedArtifactId}-parent",
+                        "version": "$version",
+                        "packaging": "pom",
+
+                        "name": "$savedArtifactId parent POM project",
+
+                        "properties/maven.version" : "3.0.0",
+                        "properties/java.version" : "1.8",
+                        "properties/maven.compiler.source" : "\${java.version}",
+                        "properties/maven.compiler.target" : "\${java.version}",
+
+                        "properties/project.build.sourceEncoding" : "UTF-8",
+
+                        "properties/maven.build.timestamp.format" : "yyyyMMddHHmmss",
+
+                        "properties/mapstruct.version" : "1.1.0.Final",
+                        "properties/dropwizard-metrics.version" : "3.2.2",
+                        "properties/jhipster.server.version" : "1.1.4",
+
+                        "properties/swagger-annotations.version": "1.5.13",
+                        "properties/webjars-locator.version": "0.33",
+                        "properties/metainf-services.version": "1.7"
+                ], [
+                        "org.slf4j:slf4j-api"
+                ]
+        ){ pom ->
+            pom.remove(pom.properties)
+            pom.remove(pom.dependencies)
+            pom.remove(pom.build)
+            pom.remove(pom.profiles)
         }
 
         // 创建 pom 文件
@@ -1869,7 +1946,9 @@ dto * with mapstruct
         ]
         // 提取文件到 web 工程
         def subdir1 = "${subProjectDir}/${artifactId.dashCase()}-web/src/main/webapp/app/entities"
-        copyAndReplaceFiles(subdir1, files)
+        copyAndReplaceFiles(subdir1, files, [
+                [match:/\.module\('\w+'\)/, replace:".module('${frameworkArtifactId.camelCase().lowerFirst()}App')", flags:"gm"]
+        ])
     }
 
     void postProcess(){
@@ -1878,14 +1957,28 @@ dto * with mapstruct
         // 创建 pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-web/pom.xml",
                 [
+                        "parent/groupId" : "$projectGroupId",
+                        "parent/artifactId" : "${artifactId}-parent",
+                        "parent/version" : "$version",
+                        "parent/relativePath" : "../${artifactId}-parent",
+
                         "groupId": "$projectGroupId",
                         "artifactId": "${artifactId.dashCase()}-web",
+                        "packaging": "jar",
                         "name": "$artifactId web project"
                 ], [
-                        "${projectGroupId}:framework-util:$version", // 依赖 framework-util
+                        "org.mapstruct:mapstruct-jdk8:\${mapstruct.version}",
+                        "io.github.jhipster:jhipster:\${jhipster.server.version}",
+                        "io.dropwizard.metrics:metrics-annotation:\${dropwizard-metrics.version}",
+                        "${frameworkGroupId}:framework-util:$version", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-application-service:$version"// 依赖 BO Service
                 ]
-        )
+        ){ pom ->
+            pom.remove(pom.properties)
+            pom.remove(pom.dependencies)
+            pom.remove(pom.build)
+            pom.remove(pom.profiles)
+        }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-web")
     }
@@ -1956,11 +2049,11 @@ service * with serviceImpl
         // 将 repository 改造成 po 的 repository
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/repository/${entityName}Repository.java".isFile()
         replaceClass("$tempSrcJavaDir", [
-                [from: "${groupId}.service.mapper.EntityMapper", to: "${projectGroupId}.framework.service.mapper.EntityMapper"],
+                [from: "${groupId}.service.mapper.EntityMapper", to: "${frameworkGroupId}.service.mapper.EntityMapper"],
                 [ from:"${groupId}.domain.AbstractAuditingEntity", to: "${projectGroupId}.application.domain.AbstractAuditingEntity"],
                 [ from:"${groupId}.repository.${entityName}Repository", to: "${projectGroupId}.repository.${entityName}Repository"]
         ], files){
-            replaceText(/\s+extends\s+EntityMapper\b/, " extends ${projectGroupId}.framework.service.mapper.EntityMapper".toRegexp(), "gm", files)
+            replaceText(/\s+extends\s+EntityMapper\b/, " extends ${frameworkGroupId}.service.mapper.EntityMapper".toRegexp(), "gm", files)
         }
         assert "$tempSrcJavaDir/${projectGroupId.packageToPath()}/repository/${entityName}Repository.java".isFile()
 
@@ -2019,42 +2112,78 @@ service * with serviceImpl
         // 创建 domain pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-domain/pom.xml",
                 [
+                        "parent/groupId" : "$projectGroupId",
+                        "parent/artifactId" : "${artifactId}-parent",
+                        "parent/version" : "$version",
+                        "parent/relativePath" : "../${artifactId}-parent",
+
                         "groupId": "$projectGroupId",
                         "artifactId": "${artifactId.dashCase()}-domain",
                         "packaging": "jar",
                         "name": "$artifactId domain project"
                 ], [
-                        "${projectGroupId}:framework-util:$version"// 依赖 framework-util
+                        "io.swagger:swagger-annotations:\${swagger-annotations.version}",
+                        "org.webjars:webjars-locator:\${webjars-locator.version}",
+                        "org.kohsuke.metainf-services:metainf-services:\${metainf-services.version}",
+                        "${frameworkGroupId}:framework-util:$version"// 依赖 framework-util
                 ]
-        )
+        ){ pom ->
+            pom.remove(pom.properties)
+            pom.remove(pom.dependencies)
+            pom.remove(pom.build)
+            pom.remove(pom.profiles)
+        }
 
         // 创建 service 定义 pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-application-service/pom.xml",
                 [
+                        "parent/groupId" : "$projectGroupId",
+                        "parent/artifactId" : "${artifactId}-parent",
+                        "parent/version" : "$version",
+                        "parent/relativePath" : "../${artifactId}-parent",
+
                         "groupId": "$projectGroupId",
                         "artifactId": "${artifactId.dashCase()}-application-service",
                         "packaging": "jar",
                         "name": "$artifactId application service project"
                 ], [
-                        "${projectGroupId}:framework-util:$version", // 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:$version", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-domain:$version"// 依赖 domain
                 ]
-        )
+        ){ pom ->
+            pom.remove(pom.properties)
+            pom.remove(pom.dependencies)
+            pom.remove(pom.build)
+            pom.remove(pom.profiles)
+        }
 
         // 创建 service impl pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-application-service-impl/pom.xml",
                 [
+                        "parent/groupId" : "$projectGroupId",
+                        "parent/artifactId" : "${artifactId}-parent",
+                        "parent/version" : "$version",
+                        "parent/relativePath" : "../${artifactId}-parent",
+
                         "groupId": "$projectGroupId",
                         "artifactId": "${artifactId.dashCase()}-application-service-impl",
                         "packaging": "jar",
                         "name": "$artifactId application service implement project"
                 ], [
-                        "${projectGroupId}:framework-util:$version", // 依赖 framework-util
+                        "org.mapstruct:mapstruct-jdk8:\${mapstruct.version}",
+                        "io.github.jhipster:jhipster:\${jhipster.server.version}",
+                        "io.dropwizard.metrics:metrics-annotation:\${dropwizard-metrics.version}",
+                        "${frameworkGroupId}:framework-util:$version", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-domain:$version", // domain
                         "$projectGroupId:${artifactId.dashCase()}-application-service:$version", // 依赖 BO Service
                         "$projectGroupId:${artifactId.dashCase()}-repository:$version"// 依赖 BO Service
                 ]
-        )
+        ){ pom ->
+            pom.remove(pom.properties)
+            pom.remove(pom.dependencies)
+            pom.remove(pom.build)
+            pom.remove(pom.profiles)
+        }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-domain")
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-application-service")
@@ -2146,7 +2275,7 @@ service * with serviceImpl
 
         if( boName != null ) {
             classMaps += [
-                    [from: "${groupId}.service.mapper.EntityMapper", to: "${projectGroupId}.framework.service.mapper.EntityMapper"],
+                    [from: "${groupId}.service.mapper.EntityMapper", to: "${frameworkGroupId}.service.mapper.EntityMapper"],
                     // 将 PO DTO 修改为 application 的 BO Domain
                     [ from:  "${groupId}.service.dto.${entityName}DTO", to:"${projectGroupId}.application.domain.${boName}"],
                     // 将 PO service 修改为 repository
@@ -2160,7 +2289,7 @@ service * with serviceImpl
 
         replaceClass("$tempSrcJavaDir", classMaps, files ){
                 replaceText(/import\s+${groupId.toRegexp()}\.domain\.\*\s*;/, /import ${groupId.toRegexp()}\.po\.\*;/, "gm", files)
-                replaceText(/\s+extends\s+EntityMapper\b/, " extends ${projectGroupId}.framework.service.mapper.EntityMapper".toRegexp(), "gm", files)
+                replaceText(/\s+extends\s+EntityMapper\b/, " extends ${frameworkGroupId}.service.mapper.EntityMapper".toRegexp(), "gm", files)
         }
 
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/access/${entityName}Access.java".isFile()
@@ -2214,13 +2343,23 @@ service * with serviceImpl
 
         // 添加 repository pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-repository/pom.xml", [
+                "parent/groupId" : "$projectGroupId",
+                "parent/artifactId" : "${artifactId}-parent",
+                "parent/version" : "$version",
+                "parent/relativePath" : "../${artifactId}-parent",
+
                 "groupId": "$projectGroupId",
                 "artifactId": "${artifactId.dashCase()}-repository",
                 "packaging": "jar",
                 "name": "$artifactId repository project"
         ], [
                 "${projectGroupId}:${artifactId.dashCase()}-domain:$version"
-        ])
+        ]){ pom ->
+            pom.remove(pom.properties)
+            pom.remove(pom.dependencies)
+            pom.remove(pom.build)
+            pom.remove(pom.profiles)
+        }
 
         // 创建 Repository 的自动注册扫描文件
         def upperArtifactId = artifactId.camelCase().replaceAll("Plugin", "").upperFirst()
@@ -2243,14 +2382,25 @@ service * with serviceImpl
 
         // 添加 repository impl pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-repository-impl/pom.xml", [
+                "parent/groupId" : "$projectGroupId",
+                "parent/artifactId" : "${artifactId}-parent",
+                "parent/version" : "$version",
+                "parent/relativePath" : "../${artifactId}-parent",
+
                 "groupId": "$projectGroupId",
                 "artifactId": "${artifactId.dashCase()}-repository-impl",
                 "packaging": "jar",
                 "name": "$artifactId repository implement project"
         ], [
+                "org.mapstruct:mapstruct-jdk8:\${mapstruct.version}",
                 "${projectGroupId}:${artifactId.dashCase()}-domain:$version",
                 "$projectGroupId:${artifactId.dashCase()}-repository:$version"
-        ])
+        ]){ pom ->
+            pom.remove(pom.properties)
+            pom.remove(pom.dependencies)
+            pom.remove(pom.build)
+            pom.remove(pom.profiles)
+        }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-repository")
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-repository-impl")
@@ -2264,10 +2414,20 @@ service * with serviceImpl
 //String frameworkPackage="cn.gyxr.saas"
 //String frameworkName="gyxrframe"
 //String homeDir="/Users/jiangjianbo/work/tech/powergen/powergen-test"
-//String homeDir="/Users/jiangjianbo/work/tech/powergen/adam2-demo"
+String homeDir="/Users/jiangjianbo/work/tech/powergen/adam2-demo"
+
+frameworkPackage="cn.gyxr.saas.frame"
+frameworkName="EdenFramework"
+
+parentGroupId="org.springframework.boot"
+parentArtifactId="spring-boot-starter-parent"
+parentVersion="1.5.3.RELEASE"
 
 Generator.frameworkGroupId = frameworkPackage
 Generator.frameworkArtifactId = frameworkName
+Generator.parentGroupId = parentGroupId
+Generator.parentArtifactId = parentArtifactId
+Generator.parentVersion = parentVersion
 
 // 增加UI层的目的是啥？
 [

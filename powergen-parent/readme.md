@@ -40,8 +40,115 @@
 
     当前对象和 XXx 实体关系的关联方向，自动生成属性
 
+## 示例
 
+1. 创建工程目录结构，一般使用 maven 创建
 
+    mvn -Dfile.encoding=UTF-8 -DinteractiveMode=false -DarchetypeArtifactId=maven-archetype-quickstart  -DarchetypeCatalog=internal archetype:generate -DgroupId=【包名】 -DartifactId=【工程名】 -Dversion=【工程版本】
 
+1. 工程创建完毕之后，目录结构中再添加 model 目录，并在其中放置三个文件，一般如下：
+    
+        src
+        └── main
+            └── model
+                ├── 【工程名】.bo.jdl
+                ├── 【工程名】.po.jdl
+                └── 【工程名】.vo.jdl
 
+    其中，创建bo、po、vo的内容，这里要注意几个要点：
+    1. 三个文件中的 entity 名字不可以重复
+    1. 实体定义的中心是 BO，一切的 VO 和 PO 都要通过 `pg-entity` 和 BO 进行对应。
+        凡是无法对应的实体，VO层面需要手工编码从后台取得正确的数据，PO层面则会变成Repository内部的存取接口。
 
+1. 然后修改 `pom.xml` 文件，增加 parent 内容：
+
+        <parent>
+            <groupId>com.github.powergen</groupId>
+            <artifactId>powergen-parent</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <relativePath>../powergen-parent/pom.xml</relativePath>
+        </parent>
+
+    如果已经对 powergen-parent 工程执行了 `mvn install` 工作，则可以删掉 `<relativePath>` 部分。
+
+1. 然后创建三个 jdl 文件：
+
+    * VO.jdl 文件内容
+    
+            /**
+            pg-entity: PortletInfo
+            */
+            entity PortletInfoPage{
+                portletId String required,
+                view String required,
+                title String required,
+                columns Integer ,
+                rows Integer
+            }
+    
+    * BO.jdl 文件内容
+    
+            entity PortletInfo{
+                portletId String required,
+                view String required,
+                title String required,
+                columns Integer ,
+                rows Integer
+            }
+    
+    * PO.jdl 文件内容
+    
+            /**
+            pg-entity: PortletInfo
+            */
+            entity PortletInfoTable{
+                portletId String required,
+                view String required,
+                title String required,
+                columns Integer ,
+                rows Integer
+            }
+
+1. 执行 `mvn compile` 命令，系统会自动执行代码生成工作，在 `target/sub-projects` 下形成完整的工程。
+
+        sub-projects/
+        ├── 【工程名】-application-service
+        │   ├── pom.xml
+        │   └── src
+        ├── 【工程名】-application-service-impl
+        │   ├── pom.xml
+        │   └── src
+        ├── 【工程名】-domain
+        │   ├── pom.xml
+        │   └── src
+        ├── 【工程名】-parent
+        │   └── pom.xml
+        ├── 【工程名】-repository
+        │   ├── pom.xml
+        │   └── src
+        ├── 【工程名】-repository-impl
+        │   ├── pom.xml
+        │   └── src
+        ├── 【工程名】-web
+        │   ├── pom.xml
+        │   └── src
+        ├── framework
+        │   ├── README.md
+        │   ├── bower.json
+        │   ├── gulp
+        │   ├── gulpfile.js
+        │   ├── mvnw
+        │   ├── mvnw.cmd
+        │   ├── node_modules
+        │   ├── package.json
+        │   ├── pom.xml
+        │   └── src
+        ├── framework-util
+        │   ├── pom.xml
+        │   └── src
+        └── pom.xml
+
+1. 根据新生成的工程代码，建议使用 目录比较工具（windows建议用 `beyond compare`，mac建议用 `DiffMerge`） 
+    将其与现有的工作目录进行比较，提取、合并代码到工作目录中。
+    
+    
