@@ -784,7 +784,9 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
                     echo "================generate from ${jdlName}======================"
                     yo jhipster:import-jdl fix-${jdlName} --force
                     retcode=\$?
-                    if [ "\$retcode" -ne "0" -a ! -d "node_modules" ] ; then
+                    echo "================generate finished [\$retcode] ======================"
+                    if [ "\$retcode" -ne "0" -o ! -d "node_modules" ] ; then
+                        echo "============== rerun yarn --ignore-engines =============="
                         yarn --ignore-engines
                         retcode=\$?
                     fi
