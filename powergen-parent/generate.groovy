@@ -384,6 +384,39 @@ String.metaClass.rightIndexOf = {String ch ->
 // assert "" == "abc".rightIndexOf("bc")
 // assert "" == "abc".rightIndexOf("abc")
 
+/**
+ * 返回 start 和 end 中间的字符串。不含 参数部分
+ */
+String.metaClass.substringBetween = {String start, String end ->
+    int len = delegate.length()
+    if( len == 0 ) return ""
+
+    int startLen = start.length()
+    int spos = startLen == 0? 0: delegate.indexOf(start)
+    int epos = end.length() == 0 ? len: delegate.indexOf(end)
+
+    int spos2 = spos + startLen
+    if( spos != -1 && epos != -1 && spos2 <= epos) return delegate[spos2 ..< epos]
+
+    return ""
+}
+
+//assert "" == "".substringBetween("", "")
+//assert "" == "a".substringBetween("a", "a")
+//assert "" == "ab".substringBetween("a", "b")
+//assert "b" == "abc".substringBetween("a", "c")
+//assert "" == "abcd".substringBetween("ab", "c")
+//assert "c" == "abcd".substringBetween("ab", "d")
+//assert "b" == "abcd".substringBetween("a", "cd")
+//assert "" == "abcd".substringBetween("ab", "cd")
+//
+//assert "" == "abcd".substringBetween("1", "a")
+//assert "" == "abcd".substringBetween("a", "1")
+//assert "" == "abcd".substringBetween("1", "1")
+//
+//assert "ab" == "abcd".substringBetween("", "c")
+//assert "d" == "abcd".substringBetween("c", "")
+//assert "abcd" == "abcd".substringBetween("", "")
 
 /**
  * 带 * 的匹配
@@ -546,6 +579,7 @@ class Generator{
     static String frameworkArtifactId
     static String frameworkGroupId
     static String parentGroupId, parentArtifactId, parentVersion
+    static String parentWebGroupId, parentWebArtifactId, parentWebVersion
 
     /**
      * 存放命令行的参数
@@ -1012,8 +1046,9 @@ class AnalysisGenerator extends Generator{
         // 将每个entity关联的信息里所有 pg- 开头的信息全部提取
         // 存放格式是 entity : {pg-KEY: value, ...}
         def parseKV = { String text, map = [:] ->
-            (text =~ /(pg\-[\w\d\-]+)\s*:\s*(.+)\s*[\r\n]*/).each{ result ->
-                map[result[1]] = result[2];
+            (text =~ /(pg\-[\w\d\-]+)\s*:\s*([\w\-\d\s,]+)\s*[\r\n]*/).each{ result ->
+                println("${result[1]} = ${result[2]}")
+                map[result[1]] = result[2].trim();
             }
 
             return map;
@@ -1030,6 +1065,7 @@ class AnalysisGenerator extends Generator{
 
         (jdl =~ entity_pattern).each{ result ->
             // 将实体相关的注释信息放入 entity: [开头注释，[关系，方向, 目标实体, 注释], [], ...]
+            println(" >>> ${result[4]} : ${result[3]}")
             entityMap[result[4]] = parseKV(result[3]);
         }
 
@@ -1841,6 +1877,9 @@ dto * with mapstruct
     def listEntityFiles(String entityName){
         // 查找 webapp 下的文件
         def webfiles = "${entitiesDir}/${entityName.dashCase()}".toFile().listFiles({File f -> !f.isDirectory() } as FileFilter)
+        "${tempSrcWebDir}/i18n".toFile().listFiles({File f -> f.isDirectory() } as FileFilter).each {
+            webfiles += "${tempSrcWebDir}/i18n/${it.name}/${entityName.lowerFirst()}.json".toFile()
+        }
 
         String entJavaDir = "${tempSrcJavaDir}/${groupId.packageToPath()}"
 
@@ -1941,7 +1980,7 @@ dto * with mapstruct
         // 先根据实体的 annotation 处理文件内容
         callJavaAction(entityName, entityOptions, relationNames, reverseRelationNames, absfiles)
 
-        def parentDir1 = "${tempSrcWebDir}/app/entities"
+        def parentDir1 = "${tempSrcWebDir}/"    //现在不仅 app/entities 里有文件，i18n/xx/xxx.json 也有
         def relFiles = absfiles.findAll{ it.absolutePath.startsWith(parentDir1) && it.exists() }.collect{File f ->
             "${f.absolutePath.relativePath(parentDir1)}"
         }
@@ -1949,7 +1988,7 @@ dto * with mapstruct
                 [dir: "$parentDir1", includes: relFiles]
         ]
         // 提取文件到 web 工程
-        def subdir1 = "${subProjectDir}/${artifactId.dashCase()}-web/src/main/webapp/app/entities"
+        def subdir1 = "${subProjectDir}/${artifactId.dashCase()}-web/src/main/webapp/"
         copyAndReplaceFiles(subdir1, files, [
                 [match:/\.module\('\w+'\)/, replace:".module('${frameworkArtifactId.camelCase().lowerFirst()}App')", flags:"gm"]
         ])
@@ -1958,13 +1997,92 @@ dto * with mapstruct
     void postProcess(){
         super.postProcess()
 
+        // 复制 domain 目录下的所有子目录
+        ant.copy(todir: "${subProjectDir}/${artifactId.dashCase()}-web/src/main/java/${projectGroupId.packageToPath()}/application/service/dto/"){
+            ant.fileset(dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/"){
+                ant.include(name: "**/*.*")
+                ant.exclude(name: "*.*")
+            }
+        }
+        // 替换 package
+        replaceText(/^\s*package ${this.groupId}\.domain\.([\w\.\d]+)\s*;/, /package ${projectGroupId}.application.service.dto.\1;/, "gm",
+                cloneFilesetMapArray([[
+                                              dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/",
+                                              includes:["**/*.java"]
+                                      ]]))
+
+        // 生成 entities.state.js
+        def navbarHtml = "$tempSrcWebDir/app/layouts/navbar/navbar.html".toFile().getText("utf-8")
+        def menuHtml = navbarHtml.substringBetween("jhipster-needle-add-element-to-menu", "jhipster-needle-add-entity-to-menu")
+
+        def NAME = /[\w\d\-]+/
+        def DNAME = /[\w\d\-\.]+/
+        def ANY = /[\s\S]+/
+        def m1 =/\<a ui\-sref="($NAME)"\s+$ANY?class="glyphicon ($NAME)"\>$ANY?span data\-translate="($DNAME)"\>(.+)\<\/span\>/
+        int idx = 0;
+        menuHtml.eachMatch(m1){ t, sref, icon, item, text ->
+            def maybe = /menu:.+,\s*menuItemText\s*:\s*'.*?'\s*,\s*/
+            def m2 =/(\.state\('${sref.toRegexp()}'\s*,\s*\{$ANY?data\s*:\s*\{[\s\r\n]*)([\s\S]*?)(maybe)?((,[^\}]+[\r\n]+)*[\r\n\s]*?\})/
+
+            def replace = "menu:'/entity/$sref', menuOrder: $idx, icon: '$icon', menuItem: '$item', menuItemText: '$text', "
+            idx = idx + 1
+
+            ant.replaceregexp(match: m2, replace: /\1${replace.toRegexp()}\2\4/, flags: "m"){
+                fileset(file: "${subProjectDir}/${artifactId.dashCase()}-web/src/main/webapp/app/entities/$sref/${sref}.state.js")
+            }
+
+            println("add menu into ${subProjectDir}/${artifactId.dashCase()}-web/src/main/webapp/app/entities/$sref/${sref}.state.js")
+            println("-- $replace")
+        }
+
+
+        // 创建 web parent pom 文件
+        copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId}-web-parent/pom.xml",
+                [
+                        "parent/groupId" : "${parentWebGroupId?:parentGroupId}",
+                        "parent/artifactId" : "${parentWebArtifactId?:parentArtifactId}",
+                        "parent/version" : "${parentWebVersion?:parentVersion}",
+
+                        "groupId": "$projectGroupId",
+                        "artifactId": "${artifactId}-web-parent",
+                        "version": "$version",
+                        "packaging": "pom",
+
+                        "name": "$artifactId Web parent POM project",
+
+                        "properties/maven.version" : "3.0.0",
+                        "properties/java.version" : "1.8",
+                        "properties/maven.compiler.source" : "\$"+"{java.version}",
+                        "properties/maven.compiler.target" : "\$"+"{java.version}",
+
+                        "properties/project.build.sourceEncoding" : "UTF-8",
+
+                        "properties/maven.build.timestamp.format" : "yyyyMMddHHmmss",
+
+                        "properties/mapstruct.version" : "1.1.0.Final",
+                        "properties/dropwizard-metrics.version" : "3.2.2",
+                        "properties/jhipster.server.version" : "1.1.4",
+
+                        "properties/swagger-annotations.version": "1.5.13",
+                        "properties/webjars-locator.version": "0.33",
+                        "properties/metainf-services.version": "1.7"
+                ], [
+                "org.slf4j:slf4j-api"
+        ]
+        ){ pom ->
+            pom.remove(pom.properties)
+            pom.remove(pom.dependencies)
+            pom.remove(pom.build)
+            pom.remove(pom.profiles)
+        }
+
         // 创建 pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-web/pom.xml",
                 [
                         "parent/groupId" : "$projectGroupId",
-                        "parent/artifactId" : "${this.artifactId}-parent",
+                        "parent/artifactId" : "${this.artifactId}-web-parent",
                         "parent/version" : "$version",
-                        "parent/relativePath" : "../${this.artifactId}-parent",
+                        "parent/relativePath" : "../${this.artifactId}-web-parent",
 
                         "groupId": "$projectGroupId",
                         "artifactId": "${artifactId.dashCase()}-web",
@@ -2015,7 +2133,11 @@ service * with serviceImpl
 
     }
 
-
+    /**
+     * 将 tempSrc 下面的 entityName 相关文件全部分类列举
+     * @param entityName
+     * @return
+     */
     def listEntityFiles(String entityName){
         String entDir = "${tempSrcJavaDir}/${groupId.packageToPath()}"
 
@@ -2101,6 +2223,20 @@ service * with serviceImpl
 
     void postProcess(){
         super.postProcess()
+
+        // 复制 domain 目录下的所有子目录
+        ant.copy(todir: "${subProjectDir}/${artifactId.dashCase()}-domain/src/main/java/${groupId.packageToPath()}/domain/"){
+            ant.fileset(dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/"){
+                ant.include(name: "**/*.*")
+                ant.exclude(name: "*.*")
+            }
+        }
+        // 替换 package
+        replaceText(/^\s*package ${this.groupId}\.domain\.([\w\.\d]+)\s*;/, /package ${projectGroupId}.application.domain.\1;/, "gm",
+                cloneFilesetMapArray([[
+                        dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/",
+                        includes:["**/*.java"]
+                ]]))
 
         // 复制 liqubase 用于描述 实体 的配置文件
         ant.copy(todir: "${subProjectDir}/${artifactId.dashCase()}-domain/src/main/resources/config/liquibase/"){
@@ -2259,6 +2395,11 @@ service * with serviceImpl
         ]
 
         String boName = entityOptions["pg-entity"] ?: null
+        if( boName != null ) {
+            println("------ entity $entityName map to $boName")
+        }else {
+            println("------ private entity $entityName ")
+        }
 
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/repository/${entityName}Repository.java".isFile()
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/domain/${entityName}.java".isFile()
@@ -2345,6 +2486,20 @@ service * with serviceImpl
     void postProcess(){
         super.postProcess()
 
+        // 复制 domain 目录下的所有子目录
+        ant.copy(todir: "${subProjectDir}/${artifactId.dashCase()}-repository/src/main/java/${groupId.packageToPath()}/po/"){
+            ant.fileset(dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/"){
+                ant.include(name: "**/*.*")
+                ant.exclude(name: "*.*")
+            }
+        }
+        // 替换 package
+        replaceText(/^\s*package ${this.groupId}\.domain\.([\w\.\d]+)\s*;/, /package ${groupId}.po.\1;/, "gm",
+                cloneFilesetMapArray([[
+                                              dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/",
+                                              includes:["**/*.java"]
+                                      ]]))
+
         // 添加 repository pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-repository/pom.xml", [
                 "parent/groupId" : "$projectGroupId",
@@ -2418,20 +2573,29 @@ service * with serviceImpl
 //String frameworkPackage="cn.gyxr.saas"
 //String frameworkName="gyxrframe"
 //String homeDir="/Users/jiangjianbo/work/tech/powergen/powergen-test"
-//String homeDir="/Users/jiangjianbo/work/tech/powergen/adam2-demo"
+String homeDir="/Users/jiangjianbo/work/tech/powergen/fdemo"
 //
-//frameworkPackage="cn.gyxr.saas.frame"
-//frameworkName="EdenFramework"
-//
-//parentGroupId="org.springframework.boot"
-//parentArtifactId="spring-boot-starter-parent"
-//parentVersion="1.5.3.RELEASE"
+frameworkPackage="cn.gyxr.saas.frame"
+frameworkName="EdenFramework"
+
+parentGroupId="org.springframework.boot"
+parentArtifactId="spring-boot-starter-parent"
+parentVersion="1.5.3.RELEASE"
+
+parentWebGroupId="cn.gyxr.saas.frame"
+parentWebArtifactId="eden-plugin-parent"
+parentWebVersion="0.0.1-SNAPSHOT"
 
 Generator.frameworkGroupId = frameworkPackage
 Generator.frameworkArtifactId = frameworkName
+
 Generator.parentGroupId = parentGroupId
 Generator.parentArtifactId = parentArtifactId
 Generator.parentVersion = parentVersion
+
+Generator.parentWebGroupId = parentWebGroupId
+Generator.parentWebArtifactId = parentWebArtifactId
+Generator.parentWebVersion = parentWebVersion
 
 // 增加UI层的目的是啥？
 [
