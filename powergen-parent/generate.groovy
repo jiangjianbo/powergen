@@ -1790,16 +1790,14 @@ service * with serviceImpl
                         "properties/maven.compiler.target" : "\$"+"{java.version}",
 
                         "properties/project.build.sourceEncoding" : "UTF-8",
-
                         "properties/maven.build.timestamp.format" : "yyyyMMddHHmmss",
 
+                        "properties/eden.framework.version" : "$version",
+                        "properties/maven.build.timestamp.format" : "yyyyMMddHHmmss",
                         "properties/mapstruct.version" : "1.1.0.Final",
-                        "properties/dropwizard-metrics.version" : "3.2.2",
                         "properties/jhipster.server.version" : "1.1.4",
+                        "properties/swagger-annotations.version" : "1.5.13"
 
-                        "properties/swagger-annotations.version": "1.5.13",
-                        "properties/webjars-locator.version": "0.33",
-                        "properties/metainf-services.version": "1.7"
                 ], [
                         "org.slf4j:slf4j-api"
                 ]
@@ -1834,9 +1832,11 @@ service * with serviceImpl
                 [
                         "groupId": "$frameworkGroupId",
                         "artifactId": "framework",
-                        "name": "$artifactId framework project"
+                        "name": "$artifactId framework project",
+
+                        "properties/eden.framework.version" : "$version"
                 ], [
-                        "${frameworkGroupId}:framework-util:$version" // 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:\${eden.framework.version}" // 依赖 framework-util
                 ]
         )
 
@@ -2048,27 +2048,10 @@ dto * with mapstruct
                         "version": "$version",
                         "packaging": "pom",
 
-                        "name": "$artifactId Web parent POM project",
-
-                        "properties/maven.version" : "3.0.0",
-                        "properties/java.version" : "1.8",
-                        "properties/maven.compiler.source" : "\$"+"{java.version}",
-                        "properties/maven.compiler.target" : "\$"+"{java.version}",
-
-                        "properties/project.build.sourceEncoding" : "UTF-8",
-
-                        "properties/maven.build.timestamp.format" : "yyyyMMddHHmmss",
-
-                        "properties/mapstruct.version" : "1.1.0.Final",
-                        "properties/dropwizard-metrics.version" : "3.2.2",
-                        "properties/jhipster.server.version" : "1.1.4",
-
-                        "properties/swagger-annotations.version": "1.5.13",
-                        "properties/webjars-locator.version": "0.33",
-                        "properties/metainf-services.version": "1.7"
+                        "name": "$artifactId Web parent POM project"
                 ], [
                 "org.slf4j:slf4j-api"
-        ]
+                ]
         ){ pom ->
             pom.remove(pom.properties)
             pom.remove(pom.dependencies)
@@ -2092,7 +2075,7 @@ dto * with mapstruct
                         "org.mapstruct:mapstruct-jdk8:\$"+"{mapstruct.version}",
                         "io.github.jhipster:jhipster:\$"+"{jhipster.server.version}",
                         "io.dropwizard.metrics:metrics-annotation:\$"+"{dropwizard-metrics.version}",
-                        "${frameworkGroupId}:framework-util:$version", // 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:\${eden.framework.version}", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-application-service:$version"// 依赖 BO Service
                 ]
         ){ pom ->
@@ -2263,9 +2246,7 @@ service * with serviceImpl
                         "name": "$artifactId domain project"
                 ], [
                         "io.swagger:swagger-annotations:\$"+"{swagger-annotations.version}",
-                        "org.webjars:webjars-locator:\$"+"{webjars-locator.version}",
-                        "org.kohsuke.metainf-services:metainf-services:\$"+"{metainf-services.version}",
-                        "${frameworkGroupId}:framework-util:$version"// 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:\${eden.framework.version}"// 依赖 framework-util
                 ]
         ){ pom ->
             pom.remove(pom.properties)
@@ -2287,7 +2268,7 @@ service * with serviceImpl
                         "packaging": "jar",
                         "name": "$artifactId application service project"
                 ], [
-                        "${frameworkGroupId}:framework-util:$version", // 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:\${eden.framework.version}", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-domain:$version"// 依赖 domain
                 ]
         ){ pom ->
@@ -2313,7 +2294,7 @@ service * with serviceImpl
                         "org.mapstruct:mapstruct-jdk8:\$"+"{mapstruct.version}",
                         "io.github.jhipster:jhipster:\$"+"{jhipster.server.version}",
                         "io.dropwizard.metrics:metrics-annotation:\$"+"{dropwizard-metrics.version}",
-                        "${frameworkGroupId}:framework-util:$version", // 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:\${eden.framework.version}", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-domain:$version", // domain
                         "$projectGroupId:${artifactId.dashCase()}-application-service:$version", // 依赖 BO Service
                         "$projectGroupId:${artifactId.dashCase()}-repository:$version"// 依赖 BO Service
@@ -2584,7 +2565,7 @@ parentVersion="1.5.3.RELEASE"
 
 parentWebGroupId="cn.gyxr.saas.frame"
 parentWebArtifactId="eden-plugin-parent"
-parentWebVersion="0.0.1-SNAPSHOT"
+parentWebVersion="0.9.1-SNAPSHOT"
 
 Generator.frameworkGroupId = frameworkPackage
 Generator.frameworkArtifactId = frameworkName
