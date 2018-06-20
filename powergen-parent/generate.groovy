@@ -1792,7 +1792,7 @@ service * with serviceImpl
                         "properties/project.build.sourceEncoding" : "UTF-8",
                         "properties/maven.build.timestamp.format" : "yyyyMMddHHmmss",
 
-                        "properties/eden.framework.version" : "$version",
+                        "properties/eden.version" : "$version",
                         "properties/maven.build.timestamp.format" : "yyyyMMddHHmmss",
                         "properties/mapstruct.version" : "1.1.0.Final",
                         "properties/jhipster.server.version" : "1.1.4",
@@ -1834,9 +1834,9 @@ service * with serviceImpl
                         "artifactId": "framework",
                         "name": "$artifactId framework project",
 
-                        "properties/eden.framework.version" : "$version"
+                        "properties/eden.version" : "$version"
                 ], [
-                        "${frameworkGroupId}:framework-util:\${eden.framework.version}" // 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:\${eden.version}" // 依赖 framework-util
                 ]
         )
 
@@ -1997,6 +1997,13 @@ dto * with mapstruct
     void postProcess(){
         super.postProcess()
 
+        // 复制 global.json 到资源目录
+        ant.copy(todir: "${subProjectDir}/${artifactId.dashCase()}-web/src/main/webapp/i18n"){
+            ant.fileset(dir:"$tempSrcJavaDir/main/webapp/i18n"){
+                ant.include(name: "**/global.json")
+            }
+        }
+
         // 复制 domain 目录下的所有子目录
         ant.copy(todir: "${subProjectDir}/${artifactId.dashCase()}-web/src/main/java/${projectGroupId.packageToPath()}/application/service/dto/"){
             ant.fileset(dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/"){
@@ -2075,7 +2082,7 @@ dto * with mapstruct
                         "org.mapstruct:mapstruct-jdk8:\$"+"{mapstruct.version}",
                         "io.github.jhipster:jhipster:\$"+"{jhipster.server.version}",
                         "io.dropwizard.metrics:metrics-annotation:\$"+"{dropwizard-metrics.version}",
-                        "${frameworkGroupId}:framework-util:\${eden.framework.version}", // 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:\${eden.version}", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-application-service:$version"// 依赖 BO Service
                 ]
         ){ pom ->
@@ -2246,7 +2253,7 @@ service * with serviceImpl
                         "name": "$artifactId domain project"
                 ], [
                         "io.swagger:swagger-annotations:\$"+"{swagger-annotations.version}",
-                        "${frameworkGroupId}:framework-util:\${eden.framework.version}"// 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:\${eden.version}"// 依赖 framework-util
                 ]
         ){ pom ->
             pom.remove(pom.properties)
@@ -2268,7 +2275,7 @@ service * with serviceImpl
                         "packaging": "jar",
                         "name": "$artifactId application service project"
                 ], [
-                        "${frameworkGroupId}:framework-util:\${eden.framework.version}", // 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:\${eden.version}", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-domain:$version"// 依赖 domain
                 ]
         ){ pom ->
@@ -2294,7 +2301,7 @@ service * with serviceImpl
                         "org.mapstruct:mapstruct-jdk8:\$"+"{mapstruct.version}",
                         "io.github.jhipster:jhipster:\$"+"{jhipster.server.version}",
                         "io.dropwizard.metrics:metrics-annotation:\$"+"{dropwizard-metrics.version}",
-                        "${frameworkGroupId}:framework-util:\${eden.framework.version}", // 依赖 framework-util
+                        "${frameworkGroupId}:framework-util:\${eden.version}", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-domain:$version", // domain
                         "$projectGroupId:${artifactId.dashCase()}-application-service:$version", // 依赖 BO Service
                         "$projectGroupId:${artifactId.dashCase()}-repository:$version"// 依赖 BO Service
