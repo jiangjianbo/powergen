@@ -1829,7 +1829,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
-			pom.remove(dependencyManagement)
+			pom.remove(pom.dependencyManagement)
         }
 
         // 创建 pom 文件
@@ -2069,7 +2069,7 @@ dto * with mapstruct
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
-			pom.remove(dependencyManagement)
+			pom.remove(pom.dependencyManagement)
         }
 
         // 创建 pom 文件
@@ -2096,7 +2096,7 @@ dto * with mapstruct
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
-			pom.remove(dependencyManagement)
+			pom.remove(pom.dependencyManagement)
         }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-web")
@@ -2267,7 +2267,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
-			pom.remove(dependencyManagement)
+			pom.remove(pom.dependencyManagement)
         }
 
         // 创建 service 定义 pom 文件
@@ -2291,7 +2291,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
-			pom.remove(dependencyManagement)
+			pom.remove(pom.dependencyManagement)
         }
 
         // 创建 service impl pom 文件
@@ -2320,7 +2320,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
-			pom.remove(dependencyManagement)
+			pom.remove(pom.dependencyManagement)
         }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-domain")
@@ -2516,7 +2516,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
-			pom.remove(dependencyManagement)
+			pom.remove(pom.dependencyManagement)
         }
 
         // 创建 Repository 的自动注册扫描文件
@@ -2558,7 +2558,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
-			pom.remove(dependencyManagement)
+			pom.remove(pom.dependencyManagement)
         }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-repository")
