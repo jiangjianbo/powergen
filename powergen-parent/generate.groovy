@@ -1046,7 +1046,7 @@ class AnalysisGenerator extends Generator{
         // 将每个entity关联的信息里所有 pg- 开头的信息全部提取
         // 存放格式是 entity : {pg-KEY: value, ...}
         def parseKV = { String text, map = [:] ->
-            (text =~ /(pg\-[\w\d\-]+)\s*:\s*([\w\-\d\s,]+)\s*[\r\n]*/).each{ result ->
+            (text =~ /(pg\-[\w\d\-]+)\s*:\s*([\w\-\d\s,]+)\s*[\r\n]+/).each{ result ->
                 println("${result[1]} = ${result[2]}")
                 map[result[1]] = result[2].trim();
             }
@@ -1796,7 +1796,8 @@ service * with serviceImpl
                         "properties/maven.build.timestamp.format" : "yyyyMMddHHmmss",
                         "properties/mapstruct.version" : "1.1.0.Final",
                         "properties/jhipster.server.version" : "1.1.4",
-                        "properties/swagger-annotations.version" : "1.5.13"
+                        "properties/swagger-annotations.version" : "1.5.13",
+						"properties/jhipster-dependencies.version" : "0.1.7"
 
                 ], [
                         "org.slf4j:slf4j-api"
@@ -1814,17 +1815,21 @@ service * with serviceImpl
                         "groupId": "$frameworkGroupId",
                         "artifactId": "framework-util",
                         "packaging": "jar",
-                        "name": "$artifactId framework util project"
+                        "name": "$artifactId framework util project",
+						
+						"properties/spring-boot.version" : "1.5.7.RELEASE",
+						"properties/slf4j.version" : "1.7.25"
                 ], [
-                        "org.springframework.boot:spring-boot-starter-data-jpa",
-                        "org.springframework.boot:spring-boot-starter-web",
-                        "org.slf4j:slf4j-api"
+                        "org.springframework.boot:spring-boot-starter-data-jpa:\${spring-boot.version}",
+                        "org.springframework.boot:spring-boot-starter-web:\${spring-boot.version}",
+                        "org.slf4j:slf4j-api:\${slf4j.version}"
                 ]
         ){ pom ->
             pom.remove(pom.properties)
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
+			pom.remove(dependencyManagement)
         }
 
         // 创建 pom 文件
@@ -1999,7 +2004,7 @@ dto * with mapstruct
 
         // 复制 global.json 到资源目录
         ant.copy(todir: "${subProjectDir}/${artifactId.dashCase()}-web/src/main/webapp/i18n"){
-            ant.fileset(dir:"$tempSrcJavaDir/main/webapp/i18n"){
+            ant.fileset(dir:"$tempSrcWebDir/i18n"){
                 ant.include(name: "**/global.json")
             }
         }
@@ -2064,6 +2069,7 @@ dto * with mapstruct
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
+			pom.remove(dependencyManagement)
         }
 
         // 创建 pom 文件
@@ -2090,6 +2096,7 @@ dto * with mapstruct
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
+			pom.remove(dependencyManagement)
         }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-web")
@@ -2260,6 +2267,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
+			pom.remove(dependencyManagement)
         }
 
         // 创建 service 定义 pom 文件
@@ -2283,6 +2291,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
+			pom.remove(dependencyManagement)
         }
 
         // 创建 service impl pom 文件
@@ -2311,6 +2320,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
+			pom.remove(dependencyManagement)
         }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-domain")
@@ -2506,6 +2516,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
+			pom.remove(dependencyManagement)
         }
 
         // 创建 Repository 的自动注册扫描文件
@@ -2547,6 +2558,7 @@ service * with serviceImpl
             pom.remove(pom.dependencies)
             pom.remove(pom.build)
             pom.remove(pom.profiles)
+			pom.remove(dependencyManagement)
         }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-repository")
