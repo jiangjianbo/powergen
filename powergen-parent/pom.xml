@@ -775,22 +775,27 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
 
     // 总的生成入口
     public void generate(){
+        println("${this.class.name} starting ...")
         if( canGenerate() ) {
             preGenerate()
             generateSources()  // 生成源代码
             postGenerate()
         }
+        println("${this.class.name} ok!")
     }
 
     // 判断是否可以生成
     boolean canGenerate(){
+        def build_flag = options["build-${layer}"]
+        println("check flag build-${layer} = $build_flag , valid value is 'force' | 'skip' ")
+
         if( ! targetDir.isDirectory() ) return true
 
         // 如果强制 build
-        if( options["build-${layer}"] == "force" ) return true;
+        if( build_flag == "force" ) return true;
 
         // 如果强制跳过
-        if( options["build-${layer}"] == "skip" ) return false;
+        if( build_flag == "skip" ) return false;
 
         if( !checkJdlUpdate("${srcModelDir}/${jdlName}", "${targetDir}/${jdlName}") ) {
             return false
@@ -1929,6 +1934,7 @@ service * with serviceImpl
 						"properties/jhipster-dependencies.version" : "0.1.7"
 
                 ], [
+                        "org.springframework.boot:spring-boot-starter-data-jpa",
                         "org.slf4j:slf4j-api"
                 ]
         ){ pom ->
@@ -2138,6 +2144,14 @@ dto * with mapstruct
             }
         }
 
+        // 复制 web/rest 目录下的所有子目录
+        ant.copy(todir: "${subProjectDir}/${artifactId.dashCase()}-web/src/main/java/${projectGroupId.packageToPath()}/web/rest/"){
+            ant.fileset(dir:"$tempSrcJavaDir/${groupId.packageToPath()}/web/rest/"){
+                ant.include(name: "**/*.*")
+                ant.exclude(name: "*.*")
+            }
+        }
+
         // 复制 domain 目录下的所有子目录
         ant.copy(todir: "${subProjectDir}/${artifactId.dashCase()}-web/src/main/java/${projectGroupId.packageToPath()}/application/service/dto/"){
             ant.fileset(dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/"){
@@ -2232,6 +2246,8 @@ dto * with mapstruct
                         "org.mapstruct:mapstruct-jdk8:\$"+"{mapstruct.version}",
                         "io.github.jhipster:jhipster:\$"+"{jhipster.server.version}",
                         "io.dropwizard.metrics:metrics-annotation:\$"+"{dropwizard-metrics.version}",
+                        "org.zalando:problem-spring-web",
+                        "javax.servlet:javax.servlet-api",
                         "${frameworkGroupId}:framework-util:\$"+"{eden.version}", // 依赖 framework-util
                         "$projectGroupId:${artifactId.dashCase()}-application-service:$version"// 依赖 BO Service
                 ]
