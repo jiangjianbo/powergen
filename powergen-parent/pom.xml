@@ -859,7 +859,7 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
         if( ! "$targetDir/node_modules".isDirectory() && "$baseDir/node_modules".isDirectory()){
             link("$baseDir/node_modules", "$targetDir/node_modules")
 
-            assert  "$targetDir/node_modules".isDirectory()
+            //assert  "$targetDir/node_modules".isDirectory()
         }
     }
 
@@ -928,15 +928,41 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
 
         if( System.getProperty("os.name").toLowerCase().indexOf("windows") >= 0 ) {
             shellscript(shell: "cmd.exe", arg: " /c call ", tmpsuffix: ".bat", dir: "${targetDir}", osfamily: "windows", failonerror: "true", """
-                call yo jhipster --force
+                rem @echo off
+				:rerun
+				echo yo jhipster --force
+				call yo jhipster --force
                 if "%errorlevel%" == "0" (
                     if not exist "${targetDir.winpath()}\\src" echo "======src not generated======" && exit 1
                     if exist "fix-${jdlName}" (
                         echo ================generate from ${jdlName}======================
                         call yo jhipster:import-jdl fix-${jdlName} --force
+                        if not exist node_modules (
+                            yarn --ignore-engines && bower install && gulp install
+                        )
                     )
                 ) else (
+					if exist "%userprofile%\\AppData\\Local\\Yarn\\bin\\yo" (
+						set PATH=%PATH%;%userprofile%\\AppData\\Local\\Yarn\\bin
+						if "%rerun%" == "" (
+							set rerun=y 
+							goto rerun
+						)
+					)
+                    
+                    node --version 
+                    if "%errorlevel%" == "9009" (
+                        echo "please install nodejs manually!" && exit 1
+                    )
+                    yarn --version
+                    if "%errorlevel%" == "9009" (
+                        echo "please install yarn manually!" && exit 1
+                    )
+					yarn global add yo bower gulp-cli generator-jhipster
+                    if "%errorlevel%" == "0" if "%rerun%" == "" set rerun=y && goto rerun
+                    
                     echo "======src not generated======" && exit 1
+                    
                 )
             """)
         }else {
@@ -1062,7 +1088,7 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
 
         def fsets = {def includefilter = null, def excludefilter = null, def fsCallback = null ->
             filesets.each { item ->
-                println("\tdir=${item['dir']}")
+                println("\tfileset dir=${item['dir']}")
                 ant.fileset(dir: "${item['dir']}") {
                     item['includes'].each {
                         boolean ok = includefilter == null || ( includefilter != null && includefilter(it) )
@@ -1095,11 +1121,15 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
         def dirname = linkDir.toFile().name
 
         if( System.getProperty("os.name").toLowerCase().indexOf("windows") >= 0 ) {
-            shellscript(shell: "cmd.exe", arg: "/c call ", tmpsuffix: ".bat", dir: "${parentDir}", osfamily: "windows", failonerror: "true", """
+            shellscript(shell: "cmd.exe", arg: "/c call ", tmpsuffix: ".bat", dir: "${parentDir}", osfamily: "windows", failonerror: "false", """
                 mklink /j ${dirname} "${srcDir.winpath()}"
+                if not "%errorlevel%" == "0" (
+				    echo "can not found mklink.exe, try xcopy "
+                    rem xcopy /e /y /i /q "${srcDir.winpath()}" "${dirname}"
+                )
             """)
         }else {
-            shellscript(shell:"bash", dir: "${parentDir}", osfamily:"unix", failonerror:"true", """
+            shellscript(shell:"bash", dir: "${parentDir}", osfamily:"unix", failonerror:"false", """
                 ln -s ${srcDir.path()} ${dirname}
                 """)
         }
@@ -1337,7 +1367,7 @@ class AnalysisGenerator extends Generator{
             if (fromClassPkg != toClassPkg) {
                 // 再替换 package xxxx; 的声明
                 System.out.println("replace package from $fromClassPkg to $toClassPkg")
-                replaceText(/^\s*package ${fromClassPkg.toRegexp()}\s*;/, /package ${toClassPkg.toRegexp()};/, "gm",
+                replaceText(/^\s*package\s+${fromClassPkg.toRegexp()}\s*;/, /package ${toClassPkg.toRegexp()};/, "gm",
                         cloneFilesetMapArray(files) {
                             it.endsWith("/${fromClassName}.java")
                         })
@@ -2160,7 +2190,7 @@ dto * with mapstruct
             }
         }
         // 替换 package
-        replaceText(/^\s*package ${this.groupId}\.domain\.([\w\.\d]+)\s*;/, /package ${projectGroupId}.application.service.dto.\1;/, "gm",
+        replaceText(/^\s*package\s+${this.groupId}\.domain\.([\w\.\d]+)\s*;/, /package\s+${projectGroupId}.application.service.dto.\1;/, "gm",
                 cloneFilesetMapArray([[
                                               dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/",
                                               includes:["**/*.java"]
@@ -2389,7 +2419,7 @@ service * with serviceImpl
             }
         }
         // 替换 package
-        replaceText(/^\s*package ${this.groupId}\.domain\.([\w\.\d]+)\s*;/, /package ${projectGroupId}.application.domain.\1;/, "gm",
+        replaceText(/^\s*package\s+${this.groupId.toRegexp()}\.domain\.([\w\.\d]+)\s*;/, /package ${projectGroupId}.application.domain.\1;/, "gm",
                 cloneFilesetMapArray([[
                         dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/",
                         includes:["**/*.java"]
@@ -2400,11 +2430,12 @@ service * with serviceImpl
             ant.fileset(dir:"$targetDir/src/main/resources/config/liquibase/"){
                 ant.include(name: "changelog/*.xml")
                 ant.exclude(name: "changelog/000000*.xml")
+                //ant.exclude(name: "*-master.xml")
             }
         }
 
-        ant.copy(file:"$targetDir/src/main/resources/config/liquibase/master.xml",
-                tofile: "${subProjectDir}/${artifactId.dashCase()}-domain/src/main/resources/config/liquibase/${artifactId.dashCase()}-master.xml")
+        //ant.copy(file:"$targetDir/src/main/resources/config/liquibase/master.xml",
+        //        tofile: "${subProjectDir}/${artifactId.dashCase()}-domain/src/main/resources/config/liquibase/${artifactId.dashCase()}-master.xml")
 
         // 创建 domain pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-domain/pom.xml",
@@ -2652,7 +2683,7 @@ service * with serviceImpl
             }
         }
         // 替换 package
-        replaceText(/^\s*package ${this.groupId}\.domain\.([\w\.\d]+)\s*;/, /package ${groupId}.po.\1;/, "gm",
+        replaceText(/^\s*package\s+${this.groupId.toRegexp()}\.domain\.([\w\.\d]+)\s*;/, /package ${groupId}.po.\1;/, "gm",
                 cloneFilesetMapArray([[
                                               dir:"$tempSrcJavaDir/${groupId.packageToPath()}/domain/",
                                               includes:["**/*.java"]
@@ -2701,9 +2732,9 @@ service * with serviceImpl
         // 添加 repository impl pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-repository-impl/pom.xml", [
                 "parent/groupId" : "$projectGroupId",
-                "parent/artifactId" : "${this.artifactId}-parent",
+                "parent/artifactId" : "${this.artifactId}-web-parent",
                 "parent/version" : "$version",
-                "parent/relativePath" : "../${this.artifactId}-parent",
+                "parent/relativePath" : "../${this.artifactId}-web-parent",
 
                 "groupId": "$projectGroupId",
                 "artifactId": "${artifactId.dashCase()}-repository-impl",
