@@ -35,6 +35,8 @@
         <parentWebArtifactId>spring-boot-starter-parentWeb</parentWebArtifactId>
         <parentWebVersion>1.5.3.RELEASE</parentWebVersion>
 
+        <jhiVersion>4.5.2</jhiVersion>
+
 	</properties>
 
 	<dependencies>
@@ -85,43 +87,50 @@
 						<configuration>
 							<target>
 								<taskdef resource="net/sf/antcontrib/antlib.xml"/>
-								<!-- https://stackoverflow.com/questions/6733684/run-ant-from-java -->
-								<property name="homeDir" value="${project.basedir}"/>
+                                <if>
+                                    <or>
+                                        <equals arg1="${project.packaging}" arg2="jar" />
+                                        <equals arg1="${project.packaging}" arg2="war" />
+                                    </or>
+                                    <then>
+                                        <!-- https://stackoverflow.com/questions/6733684/run-ant-from-java -->
+                                        <property name="homeDir" value="${project.basedir}"/>
 
-								<echo message="base dir = ${homeDir}" />
+                                        <echo message="base dir = ${homeDir}" />
 
-								<fail message="require property frameworkPackage" >
-									<condition>
-										<equals arg1="${frameworkPackage}" arg2="" trim="true" />
-									</condition>
-								</fail>
+                                        <fail message="require property frameworkPackage" >
+                                            <condition>
+                                                <equals arg1="${frameworkPackage}" arg2="" trim="true" />
+                                            </condition>
+                                        </fail>
 
-								<echo message="framework package = ${frameworkPackage}, ${frameworkName}" />
-								<echo message="parent pom = ${parentGroupId}:${parentArtifactId}:${parentVersion}" />
-								<echo message="web parent pom = ${parentWebGroupId}:${parentWebArtifactId}:${parentWebVersion}" />
+                                        <echo message="framework package = ${frameworkPackage}, ${frameworkName}" />
+                                        <echo message="parent pom = ${parentGroupId}:${parentArtifactId}:${parentVersion}" />
+                                        <echo message="web parent pom = ${parentWebGroupId}:${parentWebArtifactId}:${parentWebVersion}" />
+                                        <echo message="jhipster version = ${jhiVersion}" />
 
-								<!-- only for debug - - >
-								< ! - -
-								<if>
-									<not>
-										<available file="${project.basedir}/generate.groovy" />
-									</not>
-									<then>
-										<echo message="downloading groovy" />
-										<get src="https://raw.githubusercontent.com/jiangjianbo/powergen/master/powergen-parent/generate.groovy"
-											 dest="${project.basedir}/generate.groovy"
-											 skipexisting="true" tryGzipEncoding="true"
-                                             usetimestamp="true" verbose="true"
-                                        />
-										<echo message="download groovy complete" />
-									</then>
-								</if>
+                                        <!-- only for debug - - >
+                                        < ! - -
+                                        <if>
+                                            <not>
+                                                <available file="${project.basedir}/generate.groovy" />
+                                            </not>
+                                            <then>
+                                                <echo message="downloading groovy" />
+                                                <get src="https://raw.githubusercontent.com/jiangjianbo/powergen/master/powergen-parent/generate.groovy"
+                                                    dest="${project.basedir}/generate.groovy"
+                                                    skipexisting="true" tryGzipEncoding="true"
+                                                    usetimestamp="true" verbose="true"
+                                                />
+                                                <echo message="download groovy complete" />
+                                            </then>
+                                        </if>
 
-								<script language="groovy" src="${project.basedir}/generate.groovy">
-								</script>
-								-->
+                                        <script language="groovy" src="${project.basedir}/generate.groovy">
+                                        </script>
+                                        -->
 
-								<script language="groovy" > <![CDATA[
+                                        <script language="groovy" > <![CDATA[
 
 import groovy.transform.stc.ClosureParams
 import groovy.transform.stc.SimpleType
@@ -650,8 +659,10 @@ String.metaClass.toRegexp = {
 // assert "\\/" == "/".toRegexp()
 
 String.metaClass.relativePath = { String rootPath ->
-    if( delegate.startsWith(rootPath) ) {
-        return delegate.substring(rootPath.length()).removeAnyPrefix('/', '\\')
+    String p = delegate.path()
+    String r = rootPath.path()
+    if( p.startsWith(r) ) {
+        return p.substring(r.length()).removeAnyPrefix('/', '\\')
     } else
         return ""
 }
@@ -690,6 +701,11 @@ File.metaClass.checksum = {
     delegate.text.md5
 }
 
+File.metaClass.absPath = {
+    delegate.absolutePath.path()
+}
+
+
 ///////////////////////////////////////////////
 //
 // 开始正式功能处理
@@ -705,6 +721,7 @@ class Generator{
     static String frameworkGroupId
     static String parentGroupId, parentArtifactId, parentVersion
     static String parentWebGroupId, parentWebArtifactId, parentWebVersion
+    static String jhiVersion = "4.5.2"
 
     /**
      * 存放命令行的参数
@@ -872,7 +889,7 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
                     "packageName": "${this.groupId}",
                     "nativeLanguage": "en"
                 },
-                "jhipsterVersion": "4.5.2",
+                "jhipsterVersion": "$jhiVersion",
                 "baseName": "$artifactId",
                 "packageName": "${this.groupId}",
                 "packageFolder": "$packageDir",
@@ -927,12 +944,12 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
         }
 
         if( System.getProperty("os.name").toLowerCase().indexOf("windows") >= 0 ) {
-            shellscript(shell: "cmd.exe", arg: " /c call ", tmpsuffix: ".bat", dir: "${targetDir}", osfamily: "windows", failonerror: "true", """
-                rem @echo off
+            shellscript(shell: "cmd.exe", arg: " /V:ON /c call ", tmpsuffix: ".bat", dir: "${targetDir}", osfamily: "windows", failonerror: "true", """
+                @echo off
 				:rerun
 				echo yo jhipster --force
 				call yo jhipster --force
-                if "%errorlevel%" == "0" (
+                if not "%errorlevel%" == "0" goto else001
                     if not exist "${targetDir.winpath()}\\src" echo "======src not generated======" && exit 1
                     if exist "fix-${jdlName}" (
                         echo ================generate from ${jdlName}======================
@@ -941,29 +958,50 @@ processing ${layer}[${layerNs}] @ ${this.baseDir}
                             yarn --ignore-engines && bower install && gulp install
                         )
                     )
-                ) else (
-					if exist "%userprofile%\\AppData\\Local\\Yarn\\bin\\yo" (
-						set PATH=%PATH%;%userprofile%\\AppData\\Local\\Yarn\\bin
-						if "%rerun%" == "" (
+                    goto :EOF
+                :else001
+                    call yo --version
+                    if "%errorlevel%" == "0" goto fail000
+                    
+                    set YARN_BIN=
+                    for /f "usebackq delims==" %%v in (`yarn global bin`) do set YARN_BIN=%%v
+					if exist "%YARN_BIN%\\yo.cmd" (
+						set PATH=!PATH!;!YARN_BIN!
+						echo "yo found. add into path [%path%], rerun = !rerun!"
+						if "!rerun!" == "" (
 							set rerun=y 
+							echo === first rerun ====
 							goto rerun
 						)
+						if "!rerun!" == "y" (
+                            set rerun=yy
+                            echo === second rerun ===
+                            goto rerun
+                        )
+                        
+                        echo no rerun. fail.
+                        goto fail000
+					) else (
+					    echo "%YARN_BIN%\\yo.cmd not found!" 
 					)
                     
-                    node --version 
-                    if "%errorlevel%" == "9009" (
+                    call node --version 
+                    if "!errorlevel!" == "9009" (
                         echo "please install nodejs manually!" && exit 1
                     )
-                    yarn --version
-                    if "%errorlevel%" == "9009" (
+                    call yarn --version
+                    if "!errorlevel!" == "9009" (
                         echo "please install yarn manually!" && exit 1
                     )
-					yarn global add yo bower gulp-cli generator-jhipster
-                    if "%errorlevel%" == "0" if "%rerun%" == "" set rerun=y && goto rerun
+                    call yo jhipster --version
+                    if not "!errorlevel!" == "0" (
+					    call yarn global add yo bower gulp-cli generator-jhipster@${jhiVersion}
+                        if "!errorlevel!" == "0" if "!rerun!" == "" set rerun=y && goto rerun
+                    )
                     
+                :fail000
                     echo "======src not generated======" && exit 1
-                    
-                )
+
             """)
         }else {
             shellscript(shell:"bash", dir: "${targetDir}", osfamily:"unix", failonerror:"true", """
@@ -1346,6 +1384,7 @@ class AnalysisGenerator extends Generator{
      * @param afterReplaceCallback  在内容替换完成之后的回调函数
      */
     void replaceClass(String toDir, def classMapArray, def files, def afterReplaceCallback = null) {
+        println("replace class to $toDir , maps: $classMapArray,  files: $files")
         classMapArray.each { classMap ->
             String fromClass = classMap.from
             String toClass = classMap.to
@@ -1369,6 +1408,7 @@ class AnalysisGenerator extends Generator{
                 System.out.println("replace package from $fromClassPkg to $toClassPkg")
                 replaceText(/^\s*package\s+${fromClassPkg.toRegexp()}\s*;/, /package ${toClassPkg.toRegexp()};/, "gm",
                         cloneFilesetMapArray(files) {
+                            println("          file $it match /${fromClassName}.java")
                             it.endsWith("/${fromClassName}.java")
                         })
             }
@@ -2088,8 +2128,8 @@ dto * with mapstruct
         callJavaAction(entityName, entityOptions, relationNames, reverseRelationNames, absfiles)
 
         def parentDir1 = "${tempSrcJavaDir}/${groupId.packageToPath()}"
-        def relFiles = absfiles.findAll{ it.absolutePath.startsWith(parentDir1) && it.exists() }.collect{File f ->
-            "${f.absolutePath.relativePath(parentDir1)}"
+        def relFiles = absfiles.findAll{ it.absPath().startsWith(parentDir1) && it.exists() }.collect{File f ->
+            "${f.absPath().relativePath(parentDir1)}"
         }
         def files = [
                 [dir: "$parentDir1", includes: relFiles]
@@ -2151,8 +2191,8 @@ dto * with mapstruct
         callJavaAction(entityName, entityOptions, relationNames, reverseRelationNames, absfiles)
 
         def parentDir1 = "${tempSrcWebDir}/"    //现在不仅 app/entities 里有文件，i18n/xx/xxx.json 也有
-        def relFiles = absfiles.findAll{ it.absolutePath.startsWith(parentDir1) && it.exists() }.collect{File f ->
-            "${f.absolutePath.relativePath(parentDir1)}"
+        def relFiles = absfiles.findAll{ it.absPath().startsWith(parentDir1) && it.exists() }.collect{File f ->
+            "${f.absPath().relativePath(parentDir1)}"
         }
         def files = [
                 [dir: "$parentDir1", includes: relFiles]
@@ -2352,8 +2392,8 @@ service * with serviceImpl
         callJavaAction(entityName, entityOptions, relationNames, reverseRelationNames, absfiles)
 
         def parentDir1 = "${tempSrcJavaDir}/${groupId.packageToPath()}"
-        def relFiles = absfiles.findAll{ it.absolutePath.startsWith(parentDir1) && it.exists() }.collect{File f ->
-            "${f.absolutePath.relativePath(parentDir1)}"
+        def relFiles = absfiles.findAll{ it.absPath().startsWith(parentDir1) && it.exists() }.collect{File f ->
+            "${f.absPath().relativePath(parentDir1)}"
         }
         def files = [
                 [dir: "$parentDir1", includes: relFiles]
@@ -2576,8 +2616,9 @@ service * with serviceImpl
         callJavaAction(entityName, entityOptions, relationNames, reverseRelationNames, absfiles)
 
         def parentDir1 = "${tempSrcJavaDir}/${groupId.packageToPath()}"
-        def relFiles = absfiles.findAll{ it.absolutePath.startsWith(parentDir1) }.collect{File f ->
-            "${f.absolutePath.relativePath(parentDir1)}"
+        def relFiles = absfiles.findAll{ it.absPath().startsWith(parentDir1) }.collect{File f ->
+            println("     file to relative $f = ${f.absPath().relativePath(parentDir1)}")
+            "${f.absPath().relativePath(parentDir1)}"
         }
         def files = [
                 [dir: "$parentDir1", includes: relFiles]
@@ -2772,6 +2813,8 @@ Generator.parentWebGroupId = parentWebGroupId
 Generator.parentWebArtifactId = parentWebArtifactId
 Generator.parentWebVersion = parentWebVersion
 
+Generator.jhiVersion = jhiVersion
+
 // 增加UI层的目的是啥？
 [
     /*new UILayer(), */
@@ -2793,6 +2836,9 @@ Generator.parentWebVersion = parentWebVersion
 
 
 								]]></script>
+                                    </then>
+                                </if>
+
 							</target>
 						</configuration>
 						<goals>
