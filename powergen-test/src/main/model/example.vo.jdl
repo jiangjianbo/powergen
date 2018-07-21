@@ -15,6 +15,7 @@ entity ProjectList{
 }
 
 /** 工程
+pg-root: -
 pg-state: detail, edit
 pg-entity: ProjectBO
 pg-include-list: ProjectTask, ProjectMember
@@ -85,6 +86,7 @@ relationship OneToMany{
 }
 
 /** 任务
+pg-root: -
 pg-entity: TaskBO
 pg-state: list, detail, edit
 pg-include-list: TaskMember
@@ -116,6 +118,7 @@ relationship ManyToMany{
 }
 
 /**
+pg-root: -
 pg-entity: MemberBO
 pg-include-list: MemberTask, MemberProject
 */

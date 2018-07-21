@@ -12,6 +12,28 @@
 每一个模块工程都是带界面和后台代码的独立部分，一般包含多个project，
 能够适应微服务方式的部署。
 
+## 核心逻辑
+
+本工具的核心逻辑是设定界面（View Object， VO）、业务逻辑（Business Object， BO）
+和存储（Persistent Object， PO）三层使用的数据结构是不一致的，但是是可以相互映射的，
+且每个数据对象都有专门的传输层定义（即关联有 DTO 对象）。
+
+在具体的最终程序运行过程，存在如下的几个层：
+
+1. 界面层
+
+    一个界面的数据尽量通过一次交互就能够获得。界面层的结构，将从 VO 的 DTO 转换成 BO的DTO，
+    传递给业务层
+2. 业务层
+
+    业务层所有的 API 接口对外的交互都是通过 BO 的 DTO 对象，核心的 BO 对象不会暴露在外。
+    真正的业务处理都是使用 BO 对象进行处理。运算完成之后，BO对象直接传递给存储层。也就是说，
+    业务层是整个应用的内核，Domain对象（即BO）就是后台的通用语言。
+3. 存储层
+
+    存储层接收到 Domain 对象之后，将其转化为 PO 对象，然后存储到数据库中。
+
+
 ## 控制参数
 
 控制参数是在 pom 文件中加入的一些参数，用来输入外部的一些参数。这些控制参数都是在 pom 文件中 
@@ -27,6 +49,14 @@ properties 节点下的属性定义：
 所有生成的 pom.xml 文件的 parent pom的 artifactId
 * parentVersion
 所有生成的 pom.xml 文件的 parent pom的 version
+* parentWebGroupId
+所有生成的web插件工程 pom.xml 文件的 parent groupId
+* parentWebArtifactId
+所有生成的web插件工程 pom.xml 文件的 parent artifactId
+* parentWebVersion
+所有生成的web插件工程 pom.xml 文件的 parent version
+* jhiVersion
+使用的 jhipster 版本号，默认是 4.5.1
 
 默认的控制参数定义配置如下：
 
@@ -60,10 +90,13 @@ properties 节点下的属性定义：
 * pg-entity: YYY 当前对象是 YYY 对象的简化， 手工属性。
 
     处理时会将当前对象复制到 YYY 的目录下并改名
-* pg-map-to: YYY   
+* pg-root: XXX, pg-root: -
+
+    表示当前实体的聚合根对象是XXX，如果是“-”则表示本身就是聚合根，手工属性。只有聚合根对象才能生成 restful 的 Resource 对象
+* pg-map-to: YYY
 
     映射view对象到YYY对象的BO，手工属性
-* pg-view：XXX,YYY, ... 
+* pg-view：XXX,YYY, ...
 
     帮助在 app/views/下生成特定的视图，里边包含 directive 组合的页面，手工属性
 * pg-relationship-XXX: 

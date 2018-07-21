@@ -1237,6 +1237,7 @@ class AnalysisGenerator extends Generator{
         //assert reverseRelationMap.size() > 0
     }
 
+    public final static String PG_PATTERN = /\b(pg\-[\w\d\-]+)\s*:\s*([\w\-\d\s,]+\s*)/
     public void _load_jdl(String jdl){
         // 存放实体的信息（实体名：实体参数列表kv），以及关系的信息（实体-实体：关系参数列表kv）
         def entityMap = [:], relationMap = [:], reverseRelationMap = [:];
@@ -1244,7 +1245,7 @@ class AnalysisGenerator extends Generator{
         // 将每个entity关联的信息里所有 pg- 开头的信息全部提取
         // 存放格式是 entity : {pg-KEY: value, ...}
         def parseKV = { String text, map = [:] ->
-            (text =~ /(pg\-[\w\d\-]+)\s*:\s*([\w\-\d\s,]+)\s*[\r\n]+/).each{ result ->
+            (text =~ /${PG_PATTERN}[\r\n]+/).each{ result ->
                 println("${result[1]} = ${result[2]}")
                 map[result[1]] = result[2].trim();
             }
@@ -1253,10 +1254,10 @@ class AnalysisGenerator extends Generator{
         };
 
         // 提取entity前面的注释，以及entity相关的所有关系
-        def c_comment = "\\/\\*(?:(?!\\*\\/).|[\\n\\r])*\\*\\/";
-        def line_comment = "^\\s*\\/\\/.*[\\r\\n]+";
-        def maybe_space = "[\\r\\n\\s]*";
-        def req_space = "[\\r\\n\\s]+";
+        def c_comment = "\\/\\*(?:(?!\\*\\/).|[\\n\\r])*\\*\\/"
+        def line_comment = "^\\s*\\/\\/.*[\\r\\n]+"
+        def maybe_space = "[\\r\\n\\s]*"
+        def req_space = "[\\r\\n\\s]+"
 
         def entity_pattern = "((" + line_comment + ")|(" + c_comment + "))?" + maybe_space + // $1 $2 $3
                 "entity" + req_space + "(\\w+)" + maybe_space + "\\{";   // $4 $5
@@ -1414,9 +1415,9 @@ class AnalysisGenerator extends Generator{
             }
             if (fromClassName != toClassName) {
                 // 替换类名引用
-                replaceText(/\b${fromClassName}\b/, /${toClassName}/, "gm", files)
+                replaceText(/\b${fromClassName}\b(?!")/, /${toClassName}/, "gm", files)
                 // 替换变量名
-                replaceText(/\b${fromClassName.lowerFirst()}\b/, /${toClassName.lowerFirst()}/, "gm", files)
+                replaceText(/\b${fromClassName.lowerFirst()}\b(?!")/, /${toClassName.lowerFirst()}/, "gm", files)
             }
         }
 
@@ -1488,10 +1489,12 @@ class AnalysisGenerator extends Generator{
 
         if( dependencies != null ) dependencies.each{
             def arr = it.split(/\s*:\s*/)
+            // 格式为  groupId:artifactId:version:scope:type
             def grp = arr.size() > 0 ? arr[0]: null
             def art = arr.size() > 1 ? arr[1]: null
             def ver = arr.size() > 2 ? arr[2]: null
             def scope = arr.size() > 3 ? arr[3]: null
+            def type = arr.size() > 4 ? arr[4]: null
 
             if( !(grp == null && art == null && ver == null) ){
                 def node = pom.dependencies[0]
@@ -1501,6 +1504,7 @@ class AnalysisGenerator extends Generator{
                 if( art != null ) dep.appendNode("artifactId", art)
                 if( ver != null ) dep.appendNode("version", ver)
                 if( scope != null ) dep.appendNode("scope", scope)
+                if( type != null ) dep.appendNode("type", type)
             }
         }
 
@@ -1510,7 +1514,31 @@ class AnalysisGenerator extends Generator{
     }
 
     def removePomNode(def pom, def nodes){
-        if( nodes.size() > 0 ) pom.remove(nodes)
+        if ( pom instanceof Collection ) pom = pom[0]
+        if( nodes instanceof Collection ){
+            nodes.each{
+                pom.remove(it)
+            }
+        } else {
+            pom.remove(nodes)
+        }
+    }
+
+    def removeNodeChild(def parentNode, def callbackIf){
+        assert !(parentNode instanceof Collection) || parentNode.size() == 1
+
+        if(parentNode instanceof Collection && parentNode.size() == 1){
+            parentNode = parentNode[0]
+        }
+
+        def nodes = []
+        parentNode.children().each{
+            if( callbackIf(it) == true ) nodes += it
+        }
+
+        nodes.each{
+            removePomNode(parentNode, it)
+        }
     }
 
     def createOrGetChild(def curnode, String it){
@@ -2004,6 +2032,7 @@ service * with serviceImpl
 						"properties/jhipster-dependencies.version" : "0.1.7"
 
                 ], [
+                        "io.github.jhipster:jhipster-dependencies:\$"+ "{jhipster-dependencies.version}:import:pom",
                         "org.springframework.boot:spring-boot-starter-data-jpa",
                         "org.slf4j:slf4j-api"
                 ]
@@ -2141,47 +2170,55 @@ dto * with mapstruct
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/service/mapper/${entityName}Mapper.java".isFile()
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/domain/${entityName}.java".isFile()
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/repository/${entityName}Repository.java".isFile()
-        
-        replaceClass("$tempSrcJavaDir", [
+
+        boolean isAggRoot = (entityOptions["pg-root"] ?: "") == "-"
+        def classMaps = [
                 [from: "${this.groupId}.service.mapper.EntityMapper", to: "${frameworkGroupId}.service.mapper.EntityMapper"],
                 [from: "${this.groupId}.web.rest.util.HeaderUtil", to: "${frameworkGroupId}.web.rest.util.HeaderUtil"],
                 [from: "${this.groupId}.web.rest.util.PaginationUtil", to: "${frameworkGroupId}.web.rest.util.PaginationUtil"],
                 // 移动 DTO 的命名空间
                 [ from: "${this.groupId}.service.dto.${entityName}DTO", to: "${this.groupId}.dto.${entityName}DTO"] ,
-                // 移动 Resource 的命名空间
-                [ from:"${this.groupId}.web.rest.${entityName}Resource", to:"${this.groupId}.rest.${entityName}Resource"] ,
                 // 移动 Mapper 的命名空间
                 [ from: "${this.groupId}.service.mapper.${entityName}Mapper", to:"${this.groupId}.mapper.${entityName}Mapper"] ,
                 // 将 domain 改造成 BO DTO
                 [ from: "${this.groupId}.domain.${entityName}", to:"${projectGroupId}.application.service.dto.${boName}DTO"] ,
                 // 将 repository 改造成 BO Service
                 [ from: "${this.groupId}.repository.${entityName}Repository", to:"${projectGroupId}.application.service.${boName}Service"]
-        ], files){
+        ]
+
+        // 如果是聚合根，则增加 Resource 处理
+        if( isAggRoot ){
+            // 移动 Resource 的命名空间
+            classMaps += [ from:"${this.groupId}.web.rest.${entityName}Resource", to:"${this.groupId}.rest.${entityName}Resource"]
+        }
+
+        replaceClass("$tempSrcJavaDir", classMaps, files){
             replaceText(/\s+extends\s+EntityMapper\b/, " extends ${frameworkGroupId}.service.mapper.EntityMapper".toRegexp(), "gm", files)
             replaceText(/import\s+${groupId.toRegexp()}\.domain\.\*\s*;/, /import ${projectGroupId.toRegexp()}\.application\.service\.dto\.\*;/, "gm", files)
+            // 去掉 pg-xxx 的所有内容，避免污染代码
+            replaceText(PG_PATTERN, "", "gm", files)
         }
 
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/mapper/${entityName}Mapper.java".isFile()
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/dto/${entityName}DTO.java".isFile()
-        assert "$tempSrcJavaDir/${groupId.packageToPath()}/rest/${entityName}Resource.java".isFile()
+        if( isAggRoot ) assert "$tempSrcJavaDir/${groupId.packageToPath()}/rest/${entityName}Resource.java".isFile()
         assert "$tempSrcJavaDir/${projectGroupId.packageToPath()}/application/service/${boName}Service.java".isFile()
         assert "$tempSrcJavaDir/${projectGroupId.packageToPath()}/application/service/dto/${boName}DTO.java".isFile()
 
         // 提取文件到 web 工程
         def subdir1 = "${subProjectDir}/${artifactId.dashCase()}-web/src/main/java/"
+        def incfiles = [
+                "${this.groupId}.dto.${entityName}DTO".packageToPath() + ".java",
+                "${this.groupId}.mapper.${entityName}Mapper".packageToPath() + ".java"
+        ]
+        if( isAggRoot ) incfiles += "${this.groupId}.rest.${entityName}Resource".packageToPath() + ".java"
         copyAndReplaceFiles(subdir1, [
-                [dir: "$tempSrcJavaDir", includes: [
-                        "${this.groupId}.dto.${entityName}DTO".packageToPath() + ".java",
-                        "${this.groupId}.rest.${entityName}Resource".packageToPath() + ".java",
-                        "${this.groupId}.mapper.${entityName}Mapper".packageToPath() + ".java"
-                ]]
+                [dir: "$tempSrcJavaDir", includes: incfiles]
         ])
 
         assert "$subdir1/${groupId.packageToPath()}/dto/${entityName}DTO.java".isFile()
-        assert "$subdir1/${groupId.packageToPath()}/rest/${entityName}Resource.java".isFile()
+        if( isAggRoot ) assert "$subdir1/${groupId.packageToPath()}/rest/${entityName}Resource.java".isFile()
         assert "$subdir1/${groupId.packageToPath()}/mapper/${entityName}Mapper.java".isFile()
-
-        assert !("$subdir1/${groupId.packageToPath()}/rest/${entityName}Resource.java".toFile().text ==~ "${this.groupId}.repository.${entityName}Repository".toRegexp())
 
     }
 
@@ -2324,9 +2361,18 @@ dto * with mapstruct
         ){ pom ->
             removePomNode(pom, pom.properties)
             removePomNode(pom, pom.dependencies)
-            removePomNode(pom, pom.build)
             removePomNode(pom, pom.profiles)
 			removePomNode(pom, pom.dependencyManagement)
+
+
+            // 移除所有的plugin，保留 compiler
+            removePomNode(pom.build, pom.build.defaultGoal)
+            removePomNode(pom.build, pom.build.pluginManagement)
+
+            removeNodeChild(pom.build.plugins){
+                it.artifactId.text() != "maven-compiler-plugin"
+            }
+
         }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-web")
@@ -2420,6 +2466,8 @@ service * with serviceImpl
         replaceText(/(^\s*@[^O].+[\r\n]+)+^(\s*((public)|(private)))/, "\\2", "gm", domainFiles)
         replaceText(/(^\s*@.+[\r\n]+)+?^\s*@JoinTable(.+[\r\n]+)+?(^\s*private)/, "\\3", "gm", domainFiles)
         replaceText(/(^\s*@.+[\r\n]+)+?(^\s*private)/, "\\2", "gm", domainFiles)
+        // 去掉 pg-xxx 的所有内容，避免污染代码
+        replaceText(PG_PATTERN, "", "gm", domainFiles)
 
         // 提取文件到 domain 工程
         copyAndReplaceFiles(domainDir, domainFiles)
@@ -2481,9 +2529,9 @@ service * with serviceImpl
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-domain/pom.xml",
                 [
                         "parent/groupId" : "$projectGroupId",
-                        "parent/artifactId" : "${this.artifactId}-parent",
+                        "parent/artifactId" : "${this.artifactId}-web-parent",
                         "parent/version" : "$version",
-                        "parent/relativePath" : "../${this.artifactId}-parent",
+                        "parent/relativePath" : "../${this.artifactId}-web-parent",
 
                         "groupId": "$projectGroupId",
                         "artifactId": "${artifactId.dashCase()}-domain",
@@ -2549,9 +2597,16 @@ service * with serviceImpl
         ){ pom ->
             removePomNode(pom, pom.properties)
             removePomNode(pom, pom.dependencies)
-            removePomNode(pom, pom.build)
             removePomNode(pom, pom.profiles)
-			removePomNode(pom, pom.dependencyManagement)
+            removePomNode(pom, pom.dependencyManagement)
+
+            // 移除所有的plugin，保留 compiler
+            removePomNode(pom.build, pom.build.defaultGoal)
+            removePomNode(pom.build, pom.build.pluginManagement)
+
+            removeNodeChild(pom.build.plugins){
+                it.artifactId.text() != "maven-compiler-plugin"
+            }
         }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-domain")
@@ -2663,8 +2718,10 @@ service * with serviceImpl
         }
 
         replaceClass("$tempSrcJavaDir", classMaps, files ){
-                replaceText(/import\s+${groupId.toRegexp()}\.domain\.\*\s*;/, /import ${groupId.toRegexp()}\.po\.\*;/, "gm", files)
-                replaceText(/\s+extends\s+EntityMapper\b/, " extends ${frameworkGroupId}.service.mapper.EntityMapper".toRegexp(), "gm", files)
+            replaceText(/import\s+${groupId.toRegexp()}\.domain\.\*\s*;/, /import ${groupId.toRegexp()}\.po\.\*;/, "gm", files)
+            replaceText(/\s+extends\s+EntityMapper\b/, " extends ${frameworkGroupId}.service.mapper.EntityMapper".toRegexp(), "gm", files)
+            // 去掉 pg-xxx 的所有内容，避免污染代码
+            replaceText(PG_PATTERN, "", "gm", files)
         }
 
         assert "$tempSrcJavaDir/${groupId.packageToPath()}/access/${entityName}Access.java".isFile()
@@ -2773,9 +2830,9 @@ service * with serviceImpl
         // 添加 repository impl pom 文件
         copyPomXml("$targetDir/pom.xml", "${subProjectDir}/${artifactId.dashCase()}-repository-impl/pom.xml", [
                 "parent/groupId" : "$projectGroupId",
-                "parent/artifactId" : "${this.artifactId}-web-parent",
+                "parent/artifactId" : "${this.artifactId}-parent",
                 "parent/version" : "$version",
-                "parent/relativePath" : "../${this.artifactId}-web-parent",
+                "parent/relativePath" : "../${this.artifactId}-parent",
 
                 "groupId": "$projectGroupId",
                 "artifactId": "${artifactId.dashCase()}-repository-impl",
@@ -2784,13 +2841,22 @@ service * with serviceImpl
         ], [
                 "org.mapstruct:mapstruct-jdk8:\$"+"{mapstruct.version}",
                 "${projectGroupId}:${artifactId.dashCase()}-domain:$version",
-                "$projectGroupId:${artifactId.dashCase()}-repository:$version"
+                "$projectGroupId:${artifactId.dashCase()}-repository:$version",
+                "org.ehcache:ehcache",
+                "javax.cache:cache-api"
         ]){ pom ->
             removePomNode(pom, pom.properties)
             removePomNode(pom, pom.dependencies)
-            removePomNode(pom, pom.build)
             removePomNode(pom, pom.profiles)
 			removePomNode(pom, pom.dependencyManagement)
+
+            // 移除所有的plugin，保留 compiler
+            removePomNode(pom.build, pom.build.defaultGoal)
+            removePomNode(pom.build, pom.build.pluginManagement)
+
+            removeNodeChild(pom.build.plugins){
+                it.artifactId.text() != "maven-compiler-plugin"
+            }
         }
 
         addPomModule("$subProjectDir/pom.xml", "${artifactId.dashCase()}-repository")
