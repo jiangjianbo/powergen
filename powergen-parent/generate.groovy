@@ -1882,7 +1882,7 @@ service * with serviceImpl
 
                         "name": "$savedArtifactId parent POM project",
 
-                        "properties/maven.version" : "3.0.0",
+                        "properties/maven.version" : "3.5.0",
                         "properties/java.version" : "1.8",
                         "properties/maven.compiler.source" : "\$"+"{java.version}",
                         "properties/maven.compiler.target" : "\$"+"{java.version}",
@@ -1895,10 +1895,10 @@ service * with serviceImpl
                         "properties/mapstruct.version" : "1.1.0.Final",
                         "properties/jhipster.server.version" : "1.1.4",
                         "properties/swagger-annotations.version" : "1.5.13",
-						"properties/jhipster-dependencies.version" : "0.1.7"
+						"properties/jhipster-dependencies.version" : "0.1.7",
+                        "properties/maven-compiler-plugin.version" : "\$" + "{maven.version}"
 
                 ], [
-                        "io.github.jhipster:jhipster-dependencies:\$"+ "{jhipster-dependencies.version}:import:pom",
                         "org.springframework.boot:spring-boot-starter-data-jpa",
                         "org.slf4j:slf4j-api"
                 ]
@@ -2178,7 +2178,7 @@ dto * with mapstruct
 
                         "name": "$artifactId Web parent POM project",
 
-                        "properties/maven.version" : "3.0.0",
+                        "properties/maven.version" : "3.5.0",
                         "properties/java.version" : "1.8",
                         "properties/maven.compiler.source" : "\$"+"{java.version}",
                         "properties/maven.compiler.target" : "\$"+"{java.version}",
@@ -2191,7 +2191,8 @@ dto * with mapstruct
                         "properties/mapstruct.version" : "1.1.0.Final",
                         "properties/jhipster.server.version" : "1.1.4",
                         "properties/swagger-annotations.version" : "1.5.13",
-                        "properties/jhipster-dependencies.version" : "0.1.7"
+                        "properties/jhipster-dependencies.version" : "0.1.7",
+                        "properties/maven-compiler-plugin.version" : "\$" + "{maven.version}"
                 ], [
                 "org.slf4j:slf4j-api"
                 ]
@@ -2200,7 +2201,6 @@ dto * with mapstruct
             removePomNode(pom, pom.dependencies)
             removePomNode(pom, pom.build)
             removePomNode(pom, pom.profiles)
-			removePomNode(pom, pom.dependencyManagement)
         }
 
         // 创建 pom 文件
@@ -2776,9 +2776,6 @@ Generator.jhiVersion = jhiVersion
 ].each{
     it.generate()
 }
-
-
-
 
 
 
