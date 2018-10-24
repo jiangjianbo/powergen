@@ -80,10 +80,30 @@ properties 节点下的属性定义：
 * pg-extends: XXX, pg-implements: XXX
 
     XXX 指定实体的基类或者接口实现，其中的XXX格式定义为 value\[@\[限定,限定,...\]\]
-* pg-@XXX(xxx) 
+* pg-@XXX(xxx)
 
-    附加实体一些annotation
-* pg-state: 
+    附加实体一些annotation，可以附加在 class 和 field 上。
+* pg-id: ... / pg-embeded-id: ...
+
+    复合id，附加在class上，取值是逗号分隔的字段名字列表。
+    pg-id 会导致 field 之前加上 @Id 属性，不会生成默认 id 字段。
+    pg-embedded-id 是嵌入式Id，默认类型是“类名+Id”，优先级高于 pg-id。
+* pg-api-ignore
+
+    附加在 class 上，如果不带参数，就忽略整个 class，如果携带参数，则是逗号分隔的多个值。取值范围是 `get | getall | create | update | delete | search | batch-create | batch-update | batch-delete | last-modified`。例如 `get,delete,search`。
+* pg-api-batch: `create | update | delete`
+
+    附加在 class 上，为三个操作提供批量的 REST 接口。目前 delete 尚未实现
+* pg-request-mapping
+
+    附加在 class 上，指示 REST 接口的请求 URL 路径。如 `/abc/def`
+* pg-jpa-method: jpa方法名，参数1，... 参数n
+
+    附加jpa规则的方法名，可以有多个，用逗号分隔。例如 `findTopByStoreIdOrderByDateDesc, storeId, @createDate`。
+* pg-last-modified: 方法名, 参数1，... 参数N，@返回字段
+
+    为 REST 方法附加 getLastModified 方法，配合增量模型同步。这里的`方法名`是生成代码中调用的 `Service`或`Repository`的方法。`参数n`和`返回字段`必须是DTO的字段名
+* pg-state:
 
     手工属性，默认全部都要。取值范围为：
     none,create,delete,edit,detail,list, list-edit
@@ -113,7 +133,7 @@ properties 节点下的属性定义：
     mvn -Dfile.encoding=UTF-8 -DinteractiveMode=false -DarchetypeArtifactId=maven-archetype-quickstart  -DarchetypeCatalog=internal archetype:generate -DgroupId=【包名】 -DartifactId=【工程名】 -Dversion=【工程版本】
 
 1. 工程创建完毕之后，目录结构中再添加 model 目录，并在其中放置三个文件，一般如下：
-    
+
         src
         └── main
             └── model
@@ -140,7 +160,7 @@ properties 节点下的属性定义：
 1. 然后创建三个 jdl 文件：
 
     * VO.jdl 文件内容
-    
+
             /**
             pg-entity: PortletInfo
             */
@@ -151,9 +171,9 @@ properties 节点下的属性定义：
                 columns Integer ,
                 rows Integer
             }
-    
+
     * BO.jdl 文件内容
-    
+
             entity PortletInfo{
                 portletId String required,
                 view String required,
