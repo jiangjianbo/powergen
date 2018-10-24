@@ -97,12 +97,17 @@ properties 节点下的属性定义：
 * pg-request-mapping
 
     附加在 class 上，指示 REST 接口的请求 URL 路径。如 `/abc/def`
-* pg-jpa-method: jpa方法名，参数1，... 参数n
+* pg-jpa-method: jpa方法名，@返回类型，参数1，... 参数n
 
-    附加jpa规则的方法名，可以有多个，用逗号分隔。例如 `findTopByStoreIdOrderByDateDesc, storeId, @createDate`。
-* pg-last-modified: 方法名, 参数1，... 参数N，@返回字段
+    附加在 class 上，附加jpa规则的方法名，可以有多个，用逗号分隔。
+    例如 `findTopByStoreIdOrderByDateDesc, storeId`。
+    如果 @返回类型 缺少，则默认使用对象DTO的名字
+* pg-last-modified
 
-    为 REST 方法附加 getLastModified 方法，配合增量模型同步。这里的`方法名`是生成代码中调用的 `Service`或`Repository`的方法。`参数n`和`返回字段`必须是DTO的字段名
+    附加在 class 上，为 REST 方法附加 getLastModified 方法，配合增量模型同步。要使用本标签，实体对象中必须包含字段携带 pg-timestamp和 pg-timestamp-key。方法的返回值为 pg-timestamp，方法的参数为 pg-timestamp-key。
+* pg-timestamp, pg-timestamp-key
+
+    附加在 field 上的标注。一个实体内只有一个 pg-timestamp，但是可以有多个 pg-timestamp-key
 * pg-state:
 
     手工属性，默认全部都要。取值范围为：
