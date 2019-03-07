@@ -45,6 +45,12 @@
 			<artifactId>groovy-all</artifactId>
 			<version>2.4.12</version>
 		</dependency>
+        <!-- https://mvnrepository.com/artifact/com.netflix.devinsight.rewrite/rewrite-core -->
+        <dependency>
+            <groupId>com.netflix.devinsight.rewrite</groupId>
+            <artifactId>rewrite-core</artifactId>
+            <version>1.3.1</version>
+        </dependency>
 		<dependency>
 			<groupId>log4j</groupId>
 			<artifactId>log4j</artifactId>
@@ -2964,6 +2970,12 @@ Generator.jhiVersion = jhiVersion
 						<artifactId>ant-nodeps</artifactId>
 						<version>1.8.1</version>
 					</dependency>
+                    <dependency>
+                        <!-- https://github.com/Netflix-Skunkworks/rewrite -->
+                        <groupId>com.netflix.devinsight.rewrite</groupId>
+                        <artifactId>rewrite-core</artifactId>
+                        <version>1.2.0</version>
+                    </dependency>
 				</dependencies>
 			</plugin>
 		</plugins>

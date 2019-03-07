@@ -97,17 +97,33 @@ properties 节点下的属性定义：
 * pg-request-mapping
 
     附加在 class 上，指示 REST 接口的请求 URL 路径。如 `/abc/def`
-* pg-jpa-method: jpa方法名，@返回类型，参数1，... 参数n
 
-    附加在 class 上，附加jpa规则的方法名，可以有多个，用逗号分隔。
-    例如 `findTopByStoreIdOrderByDateDesc, storeId`。
-    如果 @返回类型 缺少，则默认使用对象DTO的名字
-* pg-last-modified
+* pg-last-modified, pg-timestamp, pg-timestamp-key
 
     附加在 class 上，为 REST 方法附加 getLastModified 方法，配合增量模型同步。要使用本标签，实体对象中必须包含字段携带 pg-timestamp和 pg-timestamp-key。方法的返回值为 pg-timestamp，方法的参数为 pg-timestamp-key。
-* pg-timestamp, pg-timestamp-key
 
-    附加在 field 上的标注。一个实体内只有一个 pg-timestamp，但是可以有多个 pg-timestamp-key
+    pg-last-modified 取值范围是留空或者 serial。 如果是 serial，会忽略 pg-timestamp-key，直接把 pg-timestamp 当做可递增的序列值。
+
+    pg-timestamp, pg-timestamp-key 是附加在 field 上的标注。一个实体内只有一个 pg-timestamp，但是可以有多个 pg-timestamp-key
+* pg-find, pg-find-return, pg-find-key, pg-find-orderby
+
+    pg-find 附加在 class 上，提供 逗号分隔的 find group 名称，不在 pg-find 中登记的 group 会被忽略。 find group名称的用途是支持多个 find 标记， 只有相同的 group 中的 find-return和find-key 才能起作用。 pg-find-return、 pg-find-key、 pg-find-orderby 附加在 field 上， 需要附加隶属的 find group 名称。 pg-find-return 也可以附加在class上。
+
+        pg-find: <group1> [, <group2>]*
+        pg-find-return: <group-name> [, <distinct|top|first>]
+        pg-find-orderby: <group-name> [, <asc|desc>]
+        pg-find-key: <group-name> [, <and|or> [, operators]]
+        operators = is|equals|less than|....
+
+    具体内容参考 [Spring官方文档]，运算符LessThan变成less than形式。
+    例如：
+        pg-find: a,b,c
+        pg-find-return: a, first10
+        pg-find-key: a, and, lessthan
+        pg-find-orderby: a, desc
+
+    如果缺少 pg-find-return 则默认返回类对象
+
 * pg-state:
 
     手工属性，默认全部都要。取值范围为：
@@ -239,7 +255,7 @@ properties 节点下的属性定义：
         │   └── src
         └── pom.xml
 
-1. 根据新生成的工程代码，建议使用 目录比较工具（windows建议用 `beyond compare`，mac建议用 `DiffMerge`） 
+1. 根据新生成的工程代码，建议使用 目录比较工具（windows建议用 `beyond compare`，mac建议用 `DiffMerge`）
     将其与现有的工作目录进行比较，提取、合并代码到工作目录中。
-    
-    
+
+[Spring官方文档]:https://docs.spring.io/spring-data/jpa/docs/1.7.2.RELEASE/reference/html/#jpa.query-methods.query-creation
